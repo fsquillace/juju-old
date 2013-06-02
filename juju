@@ -1,0 +1,110 @@
+#!/bin/bash
+#
+# This file is part of JuJu: The universal GNU/Linux package manager
+#
+# Copyright (c) 2012-2013 Filippo Squillace <feel.squally@gmail.com>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Library General Public License as published
+# by the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+NAME='juju'
+VERSION='0.2.0'
+
+
+source './lib/juju/core.sh'
+
+###################################
+### General functions           ###
+###################################
+
+usage() {
+		echo -e "JuJu: The universal package manager"
+        echo -e "Usage: $NAME <operation> [options]"
+		echo -e "The universal package manager"
+        echo -e "Operations:"
+		echo -e "-i, --install <package(s)>    Install the package(s) in ${JUJU_PACKAGE_HOME}"
+		echo -e "\tOptions:"
+        echo -e "\t-s, --source                Take the source code and compile it"
+		echo -e "-r, --remove <package(s)>     Remove the package(s) in ${JUJU_PACKAGE_HOME}"
+        echo -e "-h, --help                    Show this help message"
+        echo -e "-v, --version                 Show the $NAME version"
+}
+
+version() {
+	echo -e "JuJu ($VERSION): The universal package manager"
+	echo -e "Copyright (c) 2012-2013 Filippo Squillace <feel.squally@gmail.com>"
+	echo -e "Homepage: http://github.com/fsquillace/juju"
+}
+
+
+###################################
+### MAIN PROGRAM                ###
+###################################
+
+TEMP=`getopt -o isrhv --long install,source,remove,help,version -n 'juju' -- "$@"`
+
+if [ $? != 0 ] ; then echo -e "\033[1;31mError on parsing the command line. Try juju -h\033[0m" >&2 ; exit ; fi
+
+# Note the quotes around `$TEMP': they are essential!
+eval set -- "$TEMP"
+
+OPT_SOURCE=false
+OPT_INSTALL=false
+OPT_REMOVE=false
+OPT_HELP=false
+OPT_VERSION=false
+while true ; do
+    case "$1" in
+        -i|--install) OPT_INSTALL=true ; shift ;;
+        -s|--source) OPT_SOURCE=true ; shift ;;
+        -r|--remove) OPT_REMOVE=true ; shift ;;
+        -h|--help) OPT_HELP=true ; shift ;;
+        -v|--version) OPT_VERSION=true ; shift ;;
+        --) shift ; break ;;
+        *) echo -e "\033[1;31mInternal error!\033[0m" ; exit 1 ;;
+    esac
+done
+
+$OPT_HELP && usage && exit
+$OPT_VERSION && version && exit
+
+ARGS=()
+for arg do
+    ARGS+=($arg)
+done
+
+################## CHECKING ERROR OPTIONS ###########
+if ( [ ! -z $OPT_AUTO ] ) && ( ! $OPT_INSTALL)
+then
+    echo -e "\033[1;31mPlease specify the --install option.\033[0m"; exit 127
+fi
+
+if $OPT_INSTALL && $OPT_REMOVE; then
+    echo -e "\033[1;31mConflict between the operations --install and --remove.\033[0m" ; exit 127
+fi
+
+################ DEFINE ACTION ########################
+if $OPT_INSTALL; then
+	for pack in $ARGS
+	do
+		install_package $pack $OPT_SOURCE
+	done
+elif $OPT_REMOVE; then
+	for pack in $ARGS
+	do
+		remove_package $pack
+	done
+fi
+
+# vim: set ts=4 sw=4 noet:

@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# This file is part of JuJu: The universal GNU/Linux package manager
+#
+# Copyright (c) 2012-2013 Filippo Squillace <feel.squally@gmail.com>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Library General Public License as published
+# by the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+[ -z "$JUJU_PACKAGE_HOME" ]  && JUJU_PACKAGE_HOME="$HOME/.juju"
+JUJU_PACKAGE_HOME=$(readlink -f $JUJU_PACKAGE_HOME)
+if [ ! -d "$JUJU_PACKAGE_HOME" ]
+then
+    echo -e "\033[1;31mError: The path '$JUJU_PACKAGE_HOME' doesn't exist\033[0m"
+    exit 128
+fi
+
+
+export PATH=$PATH:${HOME}/.jujup/:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib
+
+export MANPATH=$MANPATH:$JUJU_PACKAGE_HOME/root/usr/share/man
+
+# TODO place vim and python paths
