@@ -19,12 +19,13 @@
 #
 
 
-[ -z "$JUJU_PACKAGE_HOME" ]  && JUJU_PACKAGE_HOME="$HOME/.juju"
+[ -z "$JUJU_PACKAGE_HOME" ] && JUJU_PACKAGE_HOME="$HOME/.juju"
 JUJU_PACKAGE_HOME=$(readlink -f $JUJU_PACKAGE_HOME)
+mkdir $JUJU_PACKAGE_HOME
 if [ ! -d "$JUJU_PACKAGE_HOME" ]
 then
     echo -e "\033[1;31mError: The path '$JUJU_PACKAGE_HOME' doesn't exist\033[0m"
-    exit 128
+    return 128
 fi
 
 

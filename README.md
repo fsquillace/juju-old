@@ -53,11 +53,13 @@ The 'jujuenv' file is used to get update most of the environment variables such 
 ## Advanced use
 If you want to place the packages in another the folder destination different from the default one (~/.juju),
    type the following:
+
     $> JUJU_PACKAGE_HOME=<new_destination_folder> juju -i <package_name>
 
 When JuJu install a package it first creates a temporary directory in /tmp/juju.XXXXXX for buiding the package.
 After installing the package the temporary directory is removed. If you want to keep the temporary directory for debugging
 purposes just type:
+
     $> JUJU_DEBUG=1 juju -i <package_name>
 
 ## License
