@@ -18,6 +18,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+# References:
+# https://wiki.archlinux.org/index.php/PKGBUILD
+# https://wiki.archlinux.org/index.php/Creating_Packages
+
 # Import util.sh first
 FILE="$(readlink -f ${BASH_ARGV[0]})"
 source "$(dirname ${BASH_ARGV[0]})/util.sh"
@@ -255,21 +259,52 @@ function read_pkgbuild() {
 
 }
 
+function check_version_condition(){
+#
+# $1: pkgver (mandatory)a str - i.e. "3.4.5"
+# $2: vercondition (mandatory): str -
+#     The condition are ">=","<=",">","<","=".
+#     i.e. of vercondition ">=3.4.6"
+# Return 0 if the pkgver assert the condition, 1 otherwise
+
+    local ver=$1
+    local cond=$(echo "$2" | grep -o -e ">=" -e "<=" -e ">" -e "<" -e "=")
+    local vercond="$(echo "$2" | awk -F "$cond" '{print $2}')"
+    if [[ "$cond"  == ">" ]]; then
+        [[ "$ver" > "$vercond" ]]
+    elif [[ "$cond"  == "<" ]]; then
+        [[ "$ver" < "$vercond" ]]
+    elif [[ "$cond"  == "=" ]]; then
+        [[ "$ver" == "$vercond" ]]
+    elif [[ "$cond"  == ">=" ]]; then
+        [[ "$ver" > "$vercond" ]] || [[ "$ver" == "$vercond" ]]
+    elif [[ "$cond"  == "<=" ]]; then
+        [[ "$ver" < "$vercond" ]] || [[ "$ver" == "$vercond" ]]
+    else
+        return 1
+    fi
+}
 
 function install_package(){
     # Download and build the package in a temp directory and move the package
     # built in $JUJU_PACKAGE_HOME
     #
     # Usage: install_package <pkgname> [<jujudir> <from_source>]
-    # $1: name of the package
-    # $2: bool true for installing package from source,
+    # $1: pkgname (mandatory): str -name of the package
+    # $2: from_source (optional): bool - true for installing package from source,
     #     try to take pre-compiled otherwise
     #     (default: false it detects that the arch matches)
+    # $3: version condition (optional): str - syntax '<condition><version>',
+    #     which condition={'>=','<=','>','<','='}
+    #     for example '>=5.4'
 
     # TODO add a verbose option
 
     local from_source=false
     [ -z "$2" ] || from_source=$2
+
+    local vercondition=""
+    [ -z "$3" ] || vercondition=$3
 
     # Create the dirs
     mkdir -p $JUJU_PACKAGE_HOME/root
@@ -296,7 +331,7 @@ function install_package(){
 
     builtin cd $maindir
 
-    download_package $pkgname $maindir || rollback_and_die $pkgname "Error: The package $1 doesn't exist neither in Official nor AUR repos"
+    download_package $pkgname $maindir || rollback_and_die $pkgname "Error: The package $pkgname doesn't exist neither in Official nor AUR repos"
 
     # Before sourcing PKGBUILD ask if user want to change it
     local res=$(confirm_question "Do you want to change the PKGBUILD? (y/N)> ")
@@ -307,6 +342,12 @@ function install_package(){
     fi
 
     read_pkgbuild
+
+    if [ -n "$vercondition" ]; then
+        echo -e "\033[1;37mChecking versioning $pkgver $vercondition.\033[0m"
+        check_version_condition "$pkgver" "$vercondition" \
+        || rollback_and_die $pkgname "Error: The package $pkgname doesn't match the version condition $vercondition"
+    fi
 
     # TODO handle package splitting (like vim and python2-pylint)
     if ( [ "${#pkgname[@]}" != "1"  ] ) && ( $from_source )
@@ -344,13 +385,23 @@ function install_package(){
     local installed_deps=""
     for dep in "${depends[@]}" "${makedepends[@]}"
     do
+        # Handle the version condition such as 'linux-header>=3.7'
+        local condition=$(echo "$dep" | grep -o -e ">=" -e "<=" -e ">" -e "<" -e "=")
+        if [ -n "$condition" ]; then
+            local depvercondition="${condition}$(echo "$dep" | awk -F "$condition" '{print $2}')"
+            dep=$(echo "$dep" | awk -F "$condition" '{print $1}')
+        fi
+
         local res=$(confirm_question "Do you want to install $dep package? (Y/n)> ")
         if [ "$res" == "Y" ] || [ "$res" == "y" ] || [ "$res" == "" ]; then
             installed_deps+=("'"$dep"'")
-            # TODO check the exit code of install_package for the dependency
-            /bin/bash -c "JUJU_PACKAGE_HOME=$JUJU_PACKAGE_HOME source $FILE; install_package $dep $from_source" || \
+            /bin/bash -c "export JUJU_PACKAGE_HOME=$JUJU_PACKAGE_HOME; source $FILE; install_package \"$dep\" $from_source \"$depvercondition\"" || \
                 rollback_and_die $pkgname "Error: dependency package $dep not installed."
         fi
+
+        # Be sure to unset the variable
+        unset condition
+        unset depvercondition
     done
 
 

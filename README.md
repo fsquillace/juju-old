@@ -63,6 +63,11 @@ purposes just type:
 
     $> JUJU_DEBUG=1 juju -i <package_name>
 
+## Troubleshooting
+
+1. Why don't I see the command if I use sudo?
+TODO ANSWER
+
 ## License
 Copyright (c) 2012-2013
 
