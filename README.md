@@ -3,36 +3,47 @@
 
 ## Description
 **JuJu** is a package manager that can be used for every GNU/Linux distribution.
+
 JuJu is able to get the packages from the ArchLinux Official and AUR repositories and install them
 directly in your home directory (by default is ~/.juju/).
-You can choose to install the package using the pre-compiled or from the source code. The available 
-pre-compiled packages are available for the architectures i686 and x86\_64 (in the future also armv{5,6,7} for your raspberry pi ;) ).
-JuJu was designed to be really a lightweight program written completely in bash in order to get compatibility for many systems.
 
-There are several reasons to use JuJu instead of a traditional package manager.
-I just want to mention few of them:
+You can choose to install the package using either the pre-compiled packages or from the source code. The available
+pre-compiled packages are for i686 and x86\_64 architectures (in the future also armv{5,6,7} for your raspberry pi ;) ).
+JuJu was designed to be a lightweight program written completely in bash in order to get compatibility with many systems.
+
+There are several reasons to use JuJu instead of a traditional package manager. I just want to mention few of them:
 
 1. Consider to have a server in production which run an important service. Generally,
     the system has to be as simple as possible without installing packages for administration purpose.
-    With JuJu you can install your package in your own folder directory without affecting the performance of your
+    With JuJu you can install your package in your own folder directory without affecting the performance or stability of your
     system.
 2. You can create your own GNU/Linux distribution from scratch. You can follow the Linux from Scratch guide
     (http://www.linuxfromscratch.org/lfs/) and install each packages mentioned into the guide using JuJu.
 3. JuJu is a weak dependency package manager that allow the user to choose if the package dependencies need to be installed.
+4. To get easily your vim plugins and python libraries.
 
 ## Quickstart
 After installing JuJu (See next section) install/remove a package like `tcpdump` is extremely easy.
 Type the following:
 
-    $> # To install tcpdump
+To install tcpdump:
+
     $> juju -i tcpdump
-    $> # To install tcpdump starting from the source code
+
+To install tcpdump starting from the source code:
+
     $> juju -i -s tcpdump
-    $> # For removing completely tcpdump from JuJu
+
+For removing completely tcpdump from JuJu:
+
     $> juju -r tcpdump
-    $> # Find out more options by typing
+
+Find out more options by typing
+
     $> juju --help
-    $> # Execute your program
+
+Execute your program
+
     $> sudo tcpdump -i wlan0 'tcp and dst port 80'
     $> man tcpdump
 
@@ -43,13 +54,17 @@ packages going directly to the ArchLinux website Official https://www.archlinux.
 https://aur.archlinux.org/ repositories.
 
 ## Installation
-    $> # Clone JuJu in ~/.jujup directory
+Clone JuJu in ~/.jujup directory:
+
     $> git clone git://github.com/fsquillace/juju ~/.jujup
-    $> # Source jujuenv or place the following line in your .bashrc file
+
+Source jujuenv or place the following line in your .bashrc file:
+
     $> source ~/.jujup/lib/juju/jujuenv
 
-The 'jujuenv' file is used to get update most of the environment variables such as PATH, LD\_LIBRARY\_PATH,
-    MANPATH, etc.
+The 'jujuenv' file is used to get updated most of the environment variables such as PATH, LD\_LIBRARY\_PATH,
+    MANPATH, etc. It also update the variables PYTHONPATH and VIMRUNTIME to get easily your favourite python libraries and
+    vim plugins.
 
 ## Advanced use
 If you want to place the packages in another the folder destination different from the default one (~/.juju),

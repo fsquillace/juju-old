@@ -35,4 +35,20 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAG
 
 export MANPATH=$MANPATH:$JUJU_PACKAGE_HOME/root/usr/share/man
 
-# TODO place vim and python paths
+# Update runtimepath variable
+if ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/* &> /dev/null; then
+    vimpaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/* | awk 'BEGIN{ORS=","}{print $0}')
+    vimafterpaths=""
+    if ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/*/after &> /dev/null; then
+        vimafterpaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/*/after | awk 'BEGIN{ORS=","}{print $0}')
+    fi
+    alias vim="vim -c \"set runtimepath+=$vimpaths\" -c \"set runtimepath+=$vimafterpaths\""
+    unset vimpaths
+fi
+
+# Update PYTHONPATH variable
+if ls -d $JUJU_PACKAGE_HOME/root/usr/lib/python* &> /dev/null; then
+    pypaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/lib/python*/site-packages | awk 'BEGIN{ORS=":"}{print $0}')
+    export PYTHONPATH=$PYTHONPATH:$pypaths
+    unset pypaths
+fi
