@@ -81,7 +81,16 @@ purposes just type:
 ## Troubleshooting
 
 1. Why don't I see the command if I use sudo?
+
 TODO ANSWER
+
+2. I have installed a python library (or vim plugin) but the system doesn't see it. It says "no module named 'modulename'".
+
+This is because JuJu need to update the PYTHONPATH or the vim runtimepath with the new directories created after the
+installation of the package.
+To get it updated just re-source jujuenv:
+
+    $> source ~/.jujup/lib/juju/jujuenv
 
 ## License
 Copyright (c) 2012-2013

@@ -30,6 +30,8 @@ function confirm_question(){
     echo "$res"
 }
 
+echoerr() { echo "$@" 1>&2; }
+
 function findformat() {
 # Get the format of the given file
 # Return an empty string if the file is not valid

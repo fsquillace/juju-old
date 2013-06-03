@@ -28,6 +28,8 @@ source "$(dirname ${BASH_ARGV[0]})/util.sh"
 
 set -e
 # TODO make a general control of the main commands (wget, tar, etc)
+# TODO make a lock system
+
 ################################ REPOSITORY SCRIPTS #######################################
 OFFICIAL_REPO="https://projects.archlinux.org"
 OFFICIAL_PACKAGES_REPO="$OFFICIAL_REPO/svntogit/packages.git"
@@ -40,7 +42,7 @@ AUR_SEARCH_URL="$AUR_URL/rpc.php?"
 JUJU_PACKAGE_HOME=$(readlink -f $JUJU_PACKAGE_HOME)
 if [ ! -d "$JUJU_PACKAGE_HOME" ]
 then
-    echo -e "\033[1;31mError: The path '$JUJU_PACKAGE_HOME' doesn't exist\033[0m"
+    echoerr -e "\033[1;31mError: The path '$JUJU_PACKAGE_HOME' doesn't exist\033[0m"
     exit 128
 fi
 
@@ -222,13 +224,13 @@ function compile_package(){
     builtin cd $srcdir
     type -t prepare &> /dev/null && prepare
     builtin cd $srcdir
-    type -t build &> /dev/null && build # && echo "Error: build function not worked."; return 1
+    type -t build &> /dev/null && build # && echoerr "Error: build function not worked."; return 1
     builtin cd $srcdir
     type -t check &> /dev/null && check
 
     echo -e "\033[1;37mPackaging...\033[0m"
     builtin cd $srcdir
-    type -t package &> /dev/null && package # && echo "Error: package function not worked."; return 1
+    type -t package &> /dev/null && package # && echoerr "Error: package function not worked."; return 1
     builtin cd $srcdir
     type -t package_$pkgname &> /dev/null && package_$pkgname
 
@@ -298,7 +300,7 @@ function install_package(){
     #     which condition={'>=','<=','>','<','='}
     #     for example '>=5.4'
 
-    # TODO add a verbose option
+    # TODO add a verbose option and ignore-errors option
 
     local from_source=false
     [ -z "$2" ] || from_source=$2
@@ -321,6 +323,8 @@ function install_package(){
     startdir=$maindir
     srcdir=$maindir/src
     pkgdir=$maindir/pkg
+
+    [ -d $JUJU_PACKAGE_HOME/metadata/packages/${pkgname} ] && echo -e "\033[1;37mUpdating package ${pkgname} ...\033[0m"
 
     mkdir -p $srcdir
     mkdir -p $pkgdir
@@ -352,7 +356,7 @@ function install_package(){
     # TODO handle package splitting (like vim and python2-pylint)
     if ( [ "${#pkgname[@]}" != "1"  ] ) && ( $from_source )
     then
-        echo -e "\033[1;31mError: The package splitting is not implemented yet from JuJu. Try to install using pre-compiled.\033[0m"
+        echoerr -e "\033[1;31mError: The package splitting is not implemented yet from JuJu. Try to install using pre-compiled.\033[0m"
         return 1
     fi
 
@@ -416,13 +420,13 @@ function install_package(){
             then
                 tar xvf ../${pkgname}-${pkgver}-${myarch}.pkg.tar
             else
-                echo -e "\033[1;31mError: xz command doesn't exist (Try to install it first)\033[0m"
+                echoerr -e "\033[1;31mError: xz command doesn't exist (Try to install it first)\033[0m"
                 echo -e "\033[1;37mCompiling from source files...\033[0m"
                 compile_package || rollback_and_die $pkgname "Error when compiling the package $pkgname"
             fi
             builtin cd $OLDPWD
         else
-            echo -e "\033[1;33mWarn: pre-compiled package not available, compiling it...\033[0m"
+            echoerr -e "\033[1;33mWarn: pre-compiled package not available, compiling it...\033[0m"
             compile_package || rollback_and_die $pkgname "Error when compiling the package $pkgname"
         fi
     else
@@ -430,15 +434,30 @@ function install_package(){
         compile_package || rollback_and_die $pkgname "Error when compiling the package $pkgname"
     fi
 
+    # Check if the package is already installed and remove the previous files
+    if [ -d $JUJU_PACKAGE_HOME/metadata/packages/${pkgname} ]; then
+        remove_package "${pkgname}" false &> /dev/null || \
+            echoerr -e "\033[1;33mWarn: Got an error when removing ${pkgname} old version. Continuing updating ${pkgname} anyway ...\033[0m"
+    fi
+
+    # Check the .install file
+    if [ -n "$install" ] &&  [ -f "$maindir/${install}" ]; then
+        source $maindir/${install}
+        builtin cd $JUJU_PACKAGE_HOME/root
+        type -t pre_install &> /dev/null && pre_install $pkgver
+    fi
+
+
     echo -e "\033[1;37mInstalling into the system...\033[0m"
     mkdir -p $JUJU_PACKAGE_HOME/metadata/packages/$pkgname
     # Ensure to have the matadata folder empty
     rm -r -f $JUJU_PACKAGE_HOME/metadata/packages/$pkgname/*
-    # Copy the PKGBUILD as metadata of the package
+    # Copy the PKGBUILD and .install as metadata of the package
     cp -f -a $maindir/PKGBUILD $JUJU_PACKAGE_HOME/metadata/packages/$pkgname/
+    [ -f $maindir/*.install ] && cp -f -a $maindir/*.install $JUJU_PACKAGE_HOME/metadata/packages/$pkgname/
+
     builtin cd $pkgdir
-    if [ -f .PKGINFO ] 
-    then
+    if [ -f .PKGINFO ]; then
         grep -e builddate -e packager .PKGINFO | awk -F " = " '{print $1"=\""$2"\""}' >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/PKGINFO"
         rm -f .PKGINFO
     fi
@@ -458,6 +477,12 @@ function install_package(){
     cp -f -v -a --target-directory $JUJU_PACKAGE_HOME/root *
 
     echo -e "\033[1;37m$pkgname installed successfully\033[0m"
+
+    if [ -n "$install" ] && [ -f "$maindir/${install}" ]; then
+        builtin cd $JUJU_PACKAGE_HOME/root
+        type -t post_install &> /dev/null && post_install $pkgver
+    fi
+
     # Resets all PKGBUILD variables and returns to the original wd
     unset ${vars[*]}
     cd $origin_wd
@@ -472,11 +497,11 @@ function rollback_and_die(){
 # $1: package name
 # $2: Message to print
 
-    echo -e "\033[1;31m$2\033[0m"
+    echoerr -e "\033[1;31m$2\033[0m"
     echo -e "\033[1;37mExecuting rollback procedure...\033[0m"
-    remove_package $1 false && \
+    remove_package $1 false  2> /dev/null && \
         echo -e "\033[1;37mRollback procedure completed successfully\033[0m" || \
-        echo -e "\033[1;31mRollback procedure failed\033[0m"
+        echoerr -e "\033[1;31mRollback procedure failed\033[0m"
 
     trap - QUIT EXIT ABRT KILL TERM
     exit 1
@@ -492,7 +517,7 @@ function remove_package(){
     local pkgname=$1
     if [ -z "$pkgname" ]
     then
-        echo -e "\033[1;31mError: Package name not specified\033[0m"
+        echoerr -e "\033[1;31mError: Package name not specified\033[0m"
         return 128
     fi
 
@@ -501,7 +526,7 @@ function remove_package(){
 
     if [ ! -d "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}" ]
     then
-        echo -e "\033[1;31mError: The package $pkgname is not installed\033[0m"
+        echoerr -e "\033[1;31mError: The package $pkgname is not installed\033[0m"
         return 1
     fi
 
@@ -540,7 +565,7 @@ function remove_package(){
 
     if ! rm -r -f "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}"
     then
-        echo -e "\033[1;31mError: Metadata for $pkgname were not removed\033[0m"
+        echoerr -e "\033[1;31mError: Metadata for $pkgname were not removed\033[0m"
         return 1
     fi
 
