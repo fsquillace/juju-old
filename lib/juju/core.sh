@@ -252,6 +252,8 @@ function read_pkgbuild() {
         optdepends conflicts sha256sums sha384sums sha512sums \
         replaces backup options install changelog noextract \
         package check build \
+        pre_install post_install pre_upgrade post_upgrade \
+        pre_remove post_remove \
         _svntrunk _svnmod _cvsroot_cvsmod _hgroot _hgrepo \
         _darcsmod _darcstrunk _bzrtrunk _bzrmod _gitroot _gitname \
     )
@@ -330,15 +332,17 @@ function install_package(){
     mkdir -p $pkgdir
 
     # Trap for removing the directory when the script finished
-    [ "$JUJU_DEBUG" == "1" ] && trap "/bin/rm -fr $maindir" QUIT EXIT ABRT KILL TERM
-    trap "rollback_and_die $pkgname \"Error occurred when installing $pkgname\"" QUIT EXIT ABRT KILL TERM
+    if [ -z "$JUJU_DEBUG" ] || [ "$JUJU_DEBUG" == "0" ]; then
+        trap "/bin/rm -fr $maindir" QUIT EXIT ABRT KILL TERM INT
+    fi
+    trap "rollback_and_die $pkgname \"Error occurred when installing $pkgname\"" ABRT KILL TERM INT
 
     builtin cd $maindir
 
     download_package $pkgname $maindir || rollback_and_die $pkgname "Error: The package $pkgname doesn't exist neither in Official nor AUR repos"
 
     # Before sourcing PKGBUILD ask if user want to change it
-    local res=$(confirm_question "Do you want to change the PKGBUILD? (y/N)> ")
+    local res=$(confirm_question "Do you want to change PKGBUILD file? (y/N)> ")
     if [ "$res" == "Y" ] || [ "$res" == "y" ]; then
         cmd_edit=$EDITOR
         [ -z $EDITOR ] && cmd_edit=nano
@@ -346,6 +350,17 @@ function install_package(){
     fi
 
     read_pkgbuild
+
+    # Before sourcing .install ask if user want to change it
+    if [ -n "$install" ] &&  [ -f "$maindir/${install}" ]; then
+        local res=$(confirm_question "Do you want to change ${install} file? (y/N)> ")
+        if [ "$res" == "Y" ] || [ "$res" == "y" ]; then
+            cmd_edit=$EDITOR
+            [ -z $EDITOR ] && cmd_edit=nano
+            $cmd_edit $maindir/${install}
+        fi
+    fi
+
 
     if [ -n "$vercondition" ]; then
         echo -e "\033[1;37mChecking versioning $pkgver $vercondition.\033[0m"
@@ -434,21 +449,26 @@ function install_package(){
         compile_package || rollback_and_die $pkgname "Error when compiling the package $pkgname"
     fi
 
-    # Check if the package is already installed and remove the previous files
-    if [ -d $JUJU_PACKAGE_HOME/metadata/packages/${pkgname} ]; then
-        remove_package "${pkgname}" false &> /dev/null || \
-            echoerr -e "\033[1;33mWarn: Got an error when removing ${pkgname} old version. Continuing updating ${pkgname} anyway ...\033[0m"
-    fi
 
+    echo -e "\033[1;37mInstalling into the system...\033[0m"
     # Check the .install file
     if [ -n "$install" ] &&  [ -f "$maindir/${install}" ]; then
         source $maindir/${install}
         builtin cd $JUJU_PACKAGE_HOME/root
+    fi
+
+    # If update package remove the previous files
+    local updated=false
+    [ -d "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}" ] && updated=true
+    if $updated; then
+        local old_pkgver=$(/bin/bash -c "source $JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/PKGBUILD; echo \$pkgver")
+        type -t pre_upgrade &> /dev/null && pre_upgrade "$pkgver" "$old_pkgver"
+        remove_package "${pkgname}" false &> /dev/null || \
+            echoerr -e "\033[1;33mWarn: Got an error when removing ${pkgname} old version. Continuing updating ${pkgname} anyway ...\033[0m"
+    else
         type -t pre_install &> /dev/null && pre_install $pkgver
     fi
 
-
-    echo -e "\033[1;37mInstalling into the system...\033[0m"
     mkdir -p $JUJU_PACKAGE_HOME/metadata/packages/$pkgname
     # Ensure to have the matadata folder empty
     rm -r -f $JUJU_PACKAGE_HOME/metadata/packages/$pkgname/*
@@ -478,17 +498,17 @@ function install_package(){
 
     echo -e "\033[1;37m$pkgname installed successfully\033[0m"
 
-    if [ -n "$install" ] && [ -f "$maindir/${install}" ]; then
-        builtin cd $JUJU_PACKAGE_HOME/root
+    builtin cd $JUJU_PACKAGE_HOME/root
+    if $updated; then
+        type -t post_upgrade &> /dev/null && post_upgrade $pkgver $old_pkgver
+    else
         type -t post_install &> /dev/null && post_install $pkgver
     fi
 
     # Resets all PKGBUILD variables and returns to the original wd
     unset ${vars[*]}
-    cd $origin_wd
+    builtin cd $origin_wd
 
-    # Remove all previous traps
-    trap - QUIT EXIT ABRT KILL TERM
     return 0
 }
 
@@ -503,7 +523,6 @@ function rollback_and_die(){
         echo -e "\033[1;37mRollback procedure completed successfully\033[0m" || \
         echoerr -e "\033[1;31mRollback procedure failed\033[0m"
 
-    trap - QUIT EXIT ABRT KILL TERM
     exit 1
 }
 
@@ -552,6 +571,16 @@ function remove_package(){
         return 1
     fi
 
+    # Check the .install file
+    if [ -f $JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/*.install ]; then
+        source $JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/*.install
+        builtin cd $JUJU_PACKAGE_HOME/root
+    fi
+
+    local old_pkgver=$(/bin/bash -c "source $JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/PKGBUILD; echo \$pkgver")
+    type -t pre_remove &> /dev/null && pre_remove "$old_pkgver"
+
+    # Delete all files first
     for element in  $(cat "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/FILES" | xargs)
     do
         if [ -f $element ] || [ -L $element ]
@@ -563,12 +592,16 @@ function remove_package(){
         fi
     done
 
+    # Delete the metadata
     if ! rm -r -f "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}"
     then
         echoerr -e "\033[1;31mError: Metadata for $pkgname were not removed\033[0m"
         return 1
     fi
 
+    type -t post_remove &> /dev/null && post_remove "$old_pkgver"
+
+    echo -e "\033[1;37m$pkgname removed successfully\033[0m"
     return 0
 }
 
