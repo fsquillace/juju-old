@@ -32,6 +32,17 @@ function confirm_question(){
 
 echoerr() { echo "$@" 1>&2; }
 
+function contains() {
+    local n=$#
+    local value=${!n}
+    for ((i=1;i < $#;i++)) {
+        if [ "${!i}" == "${value}" ]; then
+            return 0
+        fi
+    }
+    return 1
+}
+
 function findformat() {
 # Get the format of the given file
 # Return an empty string if the file is not valid

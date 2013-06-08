@@ -26,6 +26,9 @@
 FILE="$(readlink -f ${BASH_ARGV[0]})"
 source "$(dirname ${BASH_ARGV[0]})/util.sh"
 
+ARCHS=('any' 'i686' 'x86_64')
+REPOS=("core" "extra" "community" "multilib" "testing" "community-testing" "multilib-testing")
+
 set -e
 # TODO make a general control of the main commands (wget, tar, etc)
 # TODO make a lock system
@@ -47,8 +50,25 @@ then
 fi
 
 
-[ -z $JUJU_DEBUG ]  && JUJU_DEBUG=0
+[ -z $JUJU_DEBUG ] && JUJU_DEBUG=0
 
+function get_pkgbase(){
+# Return the pkgbase info starting from the pkgid.
+# If the package is not a package group it returns ""
+# $1: pkgname - Name of the package
+# Returns: the package base or empty string if it doesn't exist
+#
+    local pkgname=$1
+    local myarch=$(uname -m)
+    for repo in "${REPOS[@]}"
+    do
+        local pbase=$(wget -q -O - https://www.archlinux.org/packages/${repo}/$myarch/$pkgname/ | grep "Source Files" | awk -F\" '{print $2}' | awk -F/ '{ print $NF }')
+        if [ "$pbase" != "" ]; then
+            echo "$pbase"
+            return
+        fi
+    done
+}
 
 function search_package(){
     # Search a package into the repositoriesries AUR and Official
@@ -69,13 +89,14 @@ function check_integrity(){
     echo
 }
 
-function download_package(){
-    # Download a package a place the PKGBUILD and other files to the maindir
-    # Usage: update_package <pkgname> <maindir> [<jujudir>]
-    # $1: pkgname - Package name
+function download_pkgbuild(){
+    # Download a PKGBUILD tarball, place the PKGBUILD and other files to the maindir
+    # Usage: download_pkgbuild <pkgbase> <maindir>
+    # $1: pkgbase - Package base
     # $2: maindir - Directory where the package will be downloaded
     # return: 0 if successfully downloaded and 1 otherwise
 
+    local pkgbase=$1
     # Ensure to have the absolute paths
     local maindir=$(readlink -f $2)
 
@@ -84,7 +105,7 @@ function download_package(){
     local in_official=false
     for repo in ${repos[@]}
     do
-        if download_package_from_official $1 $maindir $repo
+        if download_pkgbuild_from_official $pkgbase $maindir $repo
         then
             in_official=true
             break
@@ -94,39 +115,40 @@ function download_package(){
     # Check in AUR at the end
     if ! $in_official
     then
-        download_package_from_aur $1 $maindir || return 1
+        download_pkgbuild_from_aur $pkgbase $maindir || return 1
     fi
 
     return 0
 }
 
-function download_package_from_aur(){
+function download_pkgbuild_from_aur(){
     # Download a package from AUR repo a place the PKGBUILD and other files to the maindir
-    # Usage: download_package_from_aur <pkgname> <maindir>
-    # $1: pkgname - Package name
+    # Usage: download_pkgbuild_from_aur <pkgbase> <maindir>
+    # $1: pkgbase - Package base
     # $2: maindir - Directory whare the package will be downloaded
     # return 0 if the package was successfully downloaded and 1 otherwise
 
+    local pkgbase=$1
     # Ensure to have the absolute paths
     local maindir=$(readlink -f $2)
 
-    local json_info=$(wget -q -O - "$AUR_URL/rpc.php?type=info&arg=$1")
+    local json_info=$(wget -q -O - "$AUR_URL/rpc.php?type=info&arg=$pkgbase")
     echo "$json_info" | grep "URLPath" &> /dev/null || return 1
     local pathURL=$(echo $json_info | awk -F [,:\"] '{c=1; while(var!="URLPath"){var=$c;c++}; print $(c+2)}')
 
     wget -P $maindir $(echo ${AUR_URL}${pathURL} | sed 's/\\//g')
     # Extract the PKGBUILD&co in the main directory
-    tar -C $maindir -xzvf ${pkgname}.tar.gz
-    mv $maindir/$pkgname/* . && rm -fr $maindir/$pkgname
+    tar -C $maindir -xzvf ${pkgbase}.tar.gz
+    mv $maindir/$pkgbase/* . && rm -fr $maindir/$pkgbase
 
 }
 
-function download_package_from_official(){
+function download_pkgbuild_from_official(){
     # Download a package from Official a place the PKGBUILD and other files to the maindir
-    # Usage: download_package_from_official <pkgname> <maindir>
-    # $1: pkgname - Package name
-    # $2: maindir - Directory where the package will be downloaded
-    # $3: reponame - Repository name (Default: packages)
+    # Usage: download_pkgbuild_from_official <pkgbase> <maindir> [<reponame>]
+    # $1: pkgbase (mandatory) - Package base
+    # $2: maindir (mandatory) - Directory where the package will be downloaded
+    # $3: reponame (optional) - Repository name (Default: packages)
     # return 0 if the package was successfully downloaded and 1 otherwise
 
     local repo="packages"
@@ -173,7 +195,7 @@ function download_precompiled_package(){
     # Ensure to have the absolute paths
     local maindir=$(readlink -f $4)
 
-    local repos=("core" "extra" "community" "multilib" "testing" "community-testing" "multilib-testing")
+    local repos=(${REPOS[@]})
     [ ! -z $5 ] && repos=("$5")
     local ret="1"
     for (( i=0; i<${#repos[@]}; i++ ))
@@ -259,6 +281,7 @@ function read_pkgbuild() {
     )
     unset ${vars[*]}
 
+    # TODO handle package splitting with the content of the the package_* functions (like vim and python2-pylint)
     source $maindir/PKGBUILD
 
 }
@@ -293,7 +316,7 @@ function install_package(){
     # Download and build the package in a temp directory and move the package
     # built in $JUJU_PACKAGE_HOME
     #
-    # Usage: install_package <pkgname> [<jujudir> <from_source>]
+    # Usage: install_package <pkgname> [<from_source>] [<vercondition>]
     # $1: pkgname (mandatory): str -name of the package
     # $2: from_source (optional): bool - true for installing package from source,
     #     try to take pre-compiled otherwise
@@ -320,6 +343,16 @@ function install_package(){
 
     # DEFINE MAIN VARIABLES GLOBALLY
     pkgname=$1
+    if [ -z "$pkgname" ]
+    then
+        echoerr -e "\033[1;31mError: Package name not specified\033[0m"
+        return 128
+    fi
+    pkgbase=$(get_pkgbase $pkgname)
+    if [ "$pkgbase" == "" ]; then
+        echoerr -e "\033[1;33mWarn: pkgbase field wasn't found. Trying using pkgname instead\033[0m"
+        pkgbase=$pkgname
+    fi
     maindir=$(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX) #/juju_pkg_${pkgname}_$(date +"%Y%m%d-%H%M%S")
     # Old PKGBUILD version use startdir instead of maindir
     startdir=$maindir
@@ -339,7 +372,7 @@ function install_package(){
 
     builtin cd $maindir
 
-    download_package $pkgname $maindir || rollback_and_die $pkgname "Error: The package $pkgname doesn't exist neither in Official nor AUR repos"
+    download_pkgbuild $pkgbase $maindir || rollback_and_die $pkgname "Error: The package $pkgname doesn't exist neither in Official nor AUR repos"
 
     # Before sourcing PKGBUILD ask if user want to change it
     local res=$(confirm_question "Do you want to change PKGBUILD file? (y/N)> ")
@@ -349,7 +382,17 @@ function install_package(){
         $cmd_edit $maindir/PKGBUILD
     fi
 
+    local pkgnametemp=$pkgname
     read_pkgbuild
+    # TODO handle difference between pkgname var and pkgname array
+    # Update pkgname variable
+        # assert that pkgspecname is in pkgname
+    if [ "${#pkgname[@]}" != "1" ]; then
+        contains "${pkgname[@]}" "$pkgnametemp" || \
+            rollback_and_die "$pkgnametemp" "Error: The package name $pkgnametemp doesn't belong to the package group $pkgbase"
+        pkgname=$pkgnametemp
+    fi
+
 
     # Before sourcing .install ask if user want to change it
     if [ -n "$install" ] &&  [ -f "$maindir/${install}" ]; then
@@ -366,13 +409,6 @@ function install_package(){
         echo -e "\033[1;37mChecking versioning $pkgver $vercondition.\033[0m"
         check_version_condition "$pkgver" "$vercondition" \
         || rollback_and_die $pkgname "Error: The package $pkgname doesn't match the version condition $vercondition"
-    fi
-
-    # TODO handle package splitting (like vim and python2-pylint)
-    if ( [ "${#pkgname[@]}" != "1"  ] ) && ( $from_source )
-    then
-        echoerr -e "\033[1;31mError: The package splitting is not implemented yet from JuJu. Try to install using pre-compiled.\033[0m"
-        return 1
     fi
 
     # Check for the architecture and ask to continue
@@ -431,9 +467,9 @@ function install_package(){
         then
             builtin cd $pkgdir
             # to extract we can use tar Jxvf but probably using xz command is more portable
-            if xz -d ../${pkgname}-${pkgver}-${myarch}.pkg.tar.xz
+            if xz -d ${maindir}/${pkgname}-${pkgver}-${myarch}.pkg.tar.xz
             then
-                tar xvf ../${pkgname}-${pkgver}-${myarch}.pkg.tar
+                tar xvf ${maindir}/${pkgname}-${pkgver}-${myarch}.pkg.tar
             else
                 echoerr -e "\033[1;31mError: xz command doesn't exist (Try to install it first)\033[0m"
                 echo -e "\033[1;37mCompiling from source files...\033[0m"
@@ -516,6 +552,8 @@ function rollback_and_die(){
 # Apply the rollback procedure and give the error message
 # $1: package name
 # $2: Message to print
+
+    # TODO handle the option of rolling back only when installing the package into the local repo
 
     echoerr -e "\033[1;31m$2\033[0m"
     echo -e "\033[1;37mExecuting rollback procedure...\033[0m"
