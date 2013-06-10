@@ -19,7 +19,7 @@
 #
 
 NAME='juju'
-VERSION='0.2.3'
+VERSION='0.3.3'
 
 source "$(dirname $0)/lib/juju/core.sh"
 

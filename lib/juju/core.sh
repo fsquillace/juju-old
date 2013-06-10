@@ -263,10 +263,12 @@ function read_pkgbuild() {
     # Read PKGBUILD
     # PKGBUILD must be in current directory
     #
-    # Usage:	read_pkgbuild ($update)
-    #	$update: 1: call devel_check & devel_update from makepkg
-    # Set PKGBUILD_VARS, exec "eval $PKGBUILD_VARS" to have PKGBUILD content.
-
+    # Usage:	read_pkgbuild <pkgid>
+    # $1: pkgid
+    # $2: pkgbuild filename
+    #
+    local pkgid=$1
+    local pkgbuild_path=$2
 
     # Before starting ensure that the PKGBUILD variables are reset
     vars=(pkgbase pkgname pkgver pkgrel epoch pkgdesc arch provides url \
@@ -281,9 +283,16 @@ function read_pkgbuild() {
     )
     unset ${vars[*]}
 
-    # TODO handle package splitting with the content of the the package_* functions (like vim and python2-pylint)
-    source $maindir/PKGBUILD
+    source $pkgbuild_path
 
+    # Handle package splitting with the content of the the package_* functions (like vim and python2-pylint)
+    local grep_patterns=""
+    for var in ${vars[@]}; do
+        grep_patterns="$grep_patterns --regexp=${var}="
+    done
+    local lines=""
+    type -t package_$pkgid &> /dev/null && lines=$(type package_$pkgid | grep -E $grep_patterns)
+    eval "$lines"
 }
 
 function check_version_condition(){
@@ -316,8 +325,8 @@ function install_package(){
     # Download and build the package in a temp directory and move the package
     # built in $JUJU_PACKAGE_HOME
     #
-    # Usage: install_package <pkgname> [<from_source>] [<vercondition>]
-    # $1: pkgname (mandatory): str -name of the package
+    # Usage: install_package <pkgid> [<from_source>] [<vercondition>]
+    # $1: pkgid (mandatory): str -name of the package
     # $2: from_source (optional): bool - true for installing package from source,
     #     try to take pre-compiled otherwise
     #     (default: false it detects that the arch matches)
@@ -342,37 +351,41 @@ function install_package(){
     local origin_wd=$(pwd)
 
     # DEFINE MAIN VARIABLES GLOBALLY
-    pkgname=$1
-    if [ -z "$pkgname" ]
+    # pkgid can be equal to pkgname if pkgname is a string or
+    # can be one of the element of pkgname if pkgname is an array.
+    # It is not good to override pkgname!
+    pkgid=$1
+    if [ -z "$pkgid" ]
     then
         echoerr -e "\033[1;31mError: Package name not specified\033[0m"
         return 128
     fi
-    pkgbase=$(get_pkgbase $pkgname)
+    pkgbase=$(get_pkgbase $pkgid)
     if [ "$pkgbase" == "" ]; then
-        echoerr -e "\033[1;33mWarn: pkgbase field wasn't found. Trying using pkgname instead\033[0m"
-        pkgbase=$pkgname
+        echoerr -e "\033[1;33mWarn: pkgbase field wasn't found. Trying using pkgid instead\033[0m"
+        pkgbase=$pkgid
     fi
-    maindir=$(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX) #/juju_pkg_${pkgname}_$(date +"%Y%m%d-%H%M%S")
+    maindir=$(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX) #/juju_pkg_${pkgid}_$(date +"%Y%m%d-%H%M%S")
     # Old PKGBUILD version use startdir instead of maindir
     startdir=$maindir
     srcdir=$maindir/src
     pkgdir=$maindir/pkg
 
-    [ -d $JUJU_PACKAGE_HOME/metadata/packages/${pkgname} ] && echo -e "\033[1;37mUpdating package ${pkgname} ...\033[0m"
+    [ -d $JUJU_PACKAGE_HOME/metadata/packages/${pkgid} ] && echo -e "\033[1;37mUpdating package ${pkgid} ...\033[0m"
 
     mkdir -p $srcdir
     mkdir -p $pkgdir
 
     # Trap for removing the directory when the script finished
     if [ -z "$JUJU_DEBUG" ] || [ "$JUJU_DEBUG" == "0" ]; then
-        trap "/bin/rm -fr $maindir" QUIT EXIT ABRT KILL TERM INT
+        trap "die $pkgid \"Error occurred when installing $pkgid\" false $maindir" EXIT QUIT ABRT KILL TERM INT
+    else
+        trap "die $pkgid \"Error occurred when installing $pkgid\" false \"\"" EXIT QUIT ABRT KILL TERM INT
     fi
-    trap "rollback_and_die $pkgname \"Error occurred when installing $pkgname\"" ABRT KILL TERM INT
 
     builtin cd $maindir
 
-    download_pkgbuild $pkgbase $maindir || rollback_and_die $pkgname "Error: The package $pkgname doesn't exist neither in Official nor AUR repos"
+    download_pkgbuild $pkgbase $maindir || die $pkgid "Error: The package $pkgid doesn't exist neither in Official nor AUR repos"
 
     # Before sourcing PKGBUILD ask if user want to change it
     local res=$(confirm_question "Do you want to change PKGBUILD file? (y/N)> ")
@@ -382,15 +395,11 @@ function install_package(){
         $cmd_edit $maindir/PKGBUILD
     fi
 
-    local pkgnametemp=$pkgname
-    read_pkgbuild
-    # TODO handle difference between pkgname var and pkgname array
+    read_pkgbuild $pkgid $maindir/PKGBUILD
     # Update pkgname variable
-        # assert that pkgspecname is in pkgname
     if [ "${#pkgname[@]}" != "1" ]; then
-        contains "${pkgname[@]}" "$pkgnametemp" || \
-            rollback_and_die "$pkgnametemp" "Error: The package name $pkgnametemp doesn't belong to the package group $pkgbase"
-        pkgname=$pkgnametemp
+        contains "${pkgname[@]}" "$pkgid" || \
+            die "$pkgid" "Error: The package name $pkgid doesn't belong to the package group $pkgbase"
     fi
 
 
@@ -408,7 +417,7 @@ function install_package(){
     if [ -n "$vercondition" ]; then
         echo -e "\033[1;37mChecking versioning $pkgver $vercondition.\033[0m"
         check_version_condition "$pkgver" "$vercondition" \
-        || rollback_and_die $pkgname "Error: The package $pkgname doesn't match the version condition $vercondition"
+        || die $pkgid "Error: The package $pkgid doesn't match the version condition $vercondition"
     fi
 
     # Check for the architecture and ask to continue
@@ -426,7 +435,7 @@ function install_package(){
 
     if ! $match_arch
     then
-        local res=$(confirm_question "The architecture $myarch is not suitable for $pkgname package. Do you want to continue anyway? (Y/n)> ")
+        local res=$(confirm_question "The architecture $myarch is not suitable for $pkgid package. Do you want to continue anyway? (Y/n)> ")
         if [ "$res" == "N" ] || [ "$res" == "n" ]; then
             return 1
         fi
@@ -451,7 +460,7 @@ function install_package(){
         if [ "$res" == "Y" ] || [ "$res" == "y" ] || [ "$res" == "" ]; then
             installed_deps+=("'"$dep"'")
             /bin/bash -c "export JUJU_PACKAGE_HOME=$JUJU_PACKAGE_HOME; source $FILE; install_package \"$dep\" $from_source \"$depvercondition\"" || \
-                rollback_and_die $pkgname "Error: dependency package $dep not installed."
+                die $pkgid "Error: dependency package $dep not installed."
         fi
 
         # Be sure to unset the variable
@@ -463,30 +472,35 @@ function install_package(){
     if ( [ -z $from_source ] && $match_arch ) || ( ! $from_source)
     then
         echo -e "\033[1;37mGetting pre-compiled package...\033[0m"
-        if download_precompiled_package $pkgname $pkgver $myarch $maindir
+        if download_precompiled_package $pkgid $pkgver $myarch $maindir
         then
             builtin cd $pkgdir
             # to extract we can use tar Jxvf but probably using xz command is more portable
-            if xz -d ${maindir}/${pkgname}-${pkgver}-${myarch}.pkg.tar.xz
+            if xz -d ${maindir}/${pkgid}-${pkgver}-${myarch}.pkg.tar.xz
             then
-                tar xvf ${maindir}/${pkgname}-${pkgver}-${myarch}.pkg.tar
+                tar xvf ${maindir}/${pkgid}-${pkgver}-${myarch}.pkg.tar
             else
                 echoerr -e "\033[1;31mError: xz command doesn't exist (Try to install it first)\033[0m"
                 echo -e "\033[1;37mCompiling from source files...\033[0m"
-                compile_package || rollback_and_die $pkgname "Error when compiling the package $pkgname"
+                compile_package || die $pkgid "Error when compiling the package $pkgid"
             fi
             builtin cd $OLDPWD
         else
             echoerr -e "\033[1;33mWarn: pre-compiled package not available, compiling it...\033[0m"
-            compile_package || rollback_and_die $pkgname "Error when compiling the package $pkgname"
+            compile_package || die $pkgid "Error when compiling the package $pkgid"
         fi
     else
         echo -e "\033[1;37mCompiling from source files...\033[0m"
-        compile_package || rollback_and_die $pkgname "Error when compiling the package $pkgname"
+        compile_package || die $pkgid "Error when compiling the package $pkgid"
     fi
 
 
     echo -e "\033[1;37mInstalling into the system...\033[0m"
+    # From now for any error roll back!
+    trap - QUIT EXIT ABRT KILL TERM INT
+    trap "die $pkgid \"Error occurred when installing $pkgid\" true" ABRT KILL TERM INT
+
+
     # Check the .install file
     if [ -n "$install" ] &&  [ -f "$maindir/${install}" ]; then
         source $maindir/${install}
@@ -495,44 +509,44 @@ function install_package(){
 
     # If update package remove the previous files
     local updated=false
-    [ -d "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}" ] && updated=true
+    [ -d "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}" ] && updated=true
     if $updated; then
-        local old_pkgver=$(/bin/bash -c "source $JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/PKGBUILD; echo \$pkgver")
+        local old_pkgver=$(/bin/bash -c "source $JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGBUILD; echo \$pkgver")
         type -t pre_upgrade &> /dev/null && pre_upgrade "$pkgver" "$old_pkgver"
-        remove_package "${pkgname}" false &> /dev/null || \
-            echoerr -e "\033[1;33mWarn: Got an error when removing ${pkgname} old version. Continuing updating ${pkgname} anyway ...\033[0m"
+        remove_package "${pkgid}" false &> /dev/null || \
+            echoerr -e "\033[1;33mWarn: Got an error when removing ${pkgid} old version. Continuing updating ${pkgid} anyway ...\033[0m"
     else
         type -t pre_install &> /dev/null && pre_install $pkgver
     fi
 
-    mkdir -p $JUJU_PACKAGE_HOME/metadata/packages/$pkgname
+    mkdir -p $JUJU_PACKAGE_HOME/metadata/packages/$pkgid
     # Ensure to have the matadata folder empty
-    rm -r -f $JUJU_PACKAGE_HOME/metadata/packages/$pkgname/*
+    rm -r -f $JUJU_PACKAGE_HOME/metadata/packages/$pkgid/*
     # Copy the PKGBUILD and .install as metadata of the package
-    cp -f -a $maindir/PKGBUILD $JUJU_PACKAGE_HOME/metadata/packages/$pkgname/
-    [ -f $maindir/*.install ] && cp -f -a $maindir/*.install $JUJU_PACKAGE_HOME/metadata/packages/$pkgname/
+    cp -f -a $maindir/PKGBUILD $JUJU_PACKAGE_HOME/metadata/packages/$pkgid/
+    [ -f $maindir/*.install ] && cp -f -a $maindir/*.install $JUJU_PACKAGE_HOME/metadata/packages/$pkgid/
 
     builtin cd $pkgdir
     if [ -f .PKGINFO ]; then
-        grep -e builddate -e packager .PKGINFO | awk -F " = " '{print $1"=\""$2"\""}' >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/PKGINFO"
+        grep -e builddate -e packager .PKGINFO | awk -F " = " '{print $1"=\""$2"\""}' >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
         rm -f .PKGINFO
     fi
     [ -f .MTREE ] && rm -f .MTREE
     local packpaths="$(du -ab)"
     local size=$(echo "$packpaths" | tail -n 1 | awk '{print $1}')
     local packpaths=$(echo "$packpaths" | cut -f2- | awk -v q="$JUJU_PACKAGE_HOME/root" '{sub("^.",q);print}')
-    echo "instsize=\"$size\"" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/PKGINFO"
-    echo "instdate=\"$(date +%s)\"" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/PKGINFO"
-    echo "instdeps=(${installed_deps[@]})" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/PKGINFO"
-    echo "$packpaths" > "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/FILES"
+    echo "instsize=\"$size\"" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
+    echo "instdate=\"$(date +%s)\"" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
+    echo "instdeps=(${installed_deps[@]})" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
+    echo "$packpaths" > "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/FILES"
 
     # TODO Check conflicts between the package and the root directory
-    #du -ab "$JUJU_PACKAGE_HOME/root/" "$packpaths" | grep -x -F -f $JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/${pkgname}.paths
+    #du -ab "$JUJU_PACKAGE_HOME/root/" "$packpaths" | grep -x -F -f $JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/${pkgid}.paths
 
     # The following cmds are dangerous! Could dirty the installation directory
     cp -f -v -a --target-directory $JUJU_PACKAGE_HOME/root *
 
-    echo -e "\033[1;37m$pkgname installed successfully\033[0m"
+    echo -e "\033[1;37m$pkgid installed successfully\033[0m"
 
     builtin cd $JUJU_PACKAGE_HOME/root
     if $updated; then
@@ -544,22 +558,36 @@ function install_package(){
     # Resets all PKGBUILD variables and returns to the original wd
     unset ${vars[*]}
     builtin cd $origin_wd
+    trap - QUIT EXIT ABRT KILL TERM INT
 
     return 0
 }
 
-function rollback_and_die(){
+function die(){
 # Apply the rollback procedure and give the error message
-# $1: package name
-# $2: Message to print
+# $1: pkgname (mandatory) - str: package name
+# $2: msg (mandatory) - str: Message to print
+# $3: rollback (optional) - bool: (default false)
+# $4: maindir (optional) - str: build directory to get rid
 
-    # TODO handle the option of rolling back only when installing the package into the local repo
+    local pkgname=$1
+    local msg=$2
+    local rollback=false
+    [ -n "$3" ] && rollback=$3
+    local maindir=""
+    [ -n  "$4" ] && maindir=$4
 
     echoerr -e "\033[1;31m$2\033[0m"
-    echo -e "\033[1;37mExecuting rollback procedure...\033[0m"
-    remove_package $1 false  2> /dev/null && \
-        echo -e "\033[1;37mRollback procedure completed successfully\033[0m" || \
-        echoerr -e "\033[1;31mRollback procedure failed\033[0m"
+    if $rollback
+    then
+        echo -e "\033[1;37mExecuting rollback procedure...\033[0m"
+        remove_package $1 false  2> /dev/null && \
+            echo -e "\033[1;37mRollback procedure completed successfully\033[0m" || \
+            echoerr -e "\033[1;31mRollback procedure failed\033[0m"
+    fi
+    if [ "$4" != "" ]; then
+        rm -fr "$maindir"
+    fi
 
     exit 1
 }

@@ -14,13 +14,13 @@ JuJu was designed to be a lightweight program written completely in bash in orde
 There are several reasons to use JuJu instead of a traditional package manager. I just want to mention few of them:
 
 1. Consider to have a server in production which run an important service. Generally,
-    the system has to be as simple as possible without installing packages for administration purpose.
-    With JuJu you can install your package in your own folder directory without affecting the performance or stability of your
+    it is better to keep the system has to be as simple as possible without installing further packages as root.
+    With JuJu you can install your packages in your own folder directory without affecting the performance or stability of your
     system.
 2. You can create your own GNU/Linux distribution from scratch. You can follow the Linux from Scratch guide
     (http://www.linuxfromscratch.org/lfs/) and install each packages mentioned into the guide using JuJu.
 3. JuJu is a weak dependency package manager that allow the user to choose if the package dependencies need to be installed.
-4. To get easily your vim plugins and python libraries.
+4. To get easily your vim plugins, python libraries and more for every host you are logged in.
 
 ## Quickstart
 After installing JuJu (See next section) install/remove a package like `tcpdump` is extremely easy.
@@ -38,11 +38,11 @@ For removing completely tcpdump from JuJu:
 
     $> juju -r tcpdump
 
-Find out more options by typing
+Find out more options by typing:
 
     $> juju --help
 
-Execute your program
+Execute your program:
 
     $> sudo tcpdump -i wlan0 'tcp and dst port 80'
     $> man tcpdump
@@ -67,13 +67,13 @@ The 'jujuenv' file is used to get updated most of the environment variables such
     vim plugins.
 
 ## Advanced use
-If you want to place the packages in another the folder destination different from the default one (~/.juju),
+If you want to place the packages in a particular folder different from the default one (~/.juju),
    type the following:
 
     $> JUJU_PACKAGE_HOME=<new_destination_folder> juju -i <package_name>
 
-When JuJu install a package it first creates a temporary directory in /tmp/juju.XXXXXX for buiding the package.
-After installing the package the temporary directory is removed. If you want to keep the temporary directory for debugging
+When JuJu installs a package it first creates a temporary directory in /tmp/juju.XXXXXX for buiding the package.
+After installing the package the temporary directory is automatically removed. If you want to keep the temporary directory for debugging
 purposes just type:
 
     $> JUJU_DEBUG=1 juju -i <package_name>
