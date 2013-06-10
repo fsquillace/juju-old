@@ -19,7 +19,7 @@
 #
 
 NAME='juju'
-VERSION='0.3.3'
+VERSION='0.3.5'
 
 source "$(dirname $0)/lib/juju/core.sh"
 
@@ -36,6 +36,7 @@ usage() {
 		echo -e "\tOptions:"
         echo -e "\t-s, --source                Take the source code and compile it"
 		echo -e "-r, --remove <package(s)>     Remove the package(s) in ${JUJU_PACKAGE_HOME}"
+		echo -e "-l, --list                    List the packages installed in ${JUJU_PACKAGE_HOME}"
         echo -e "-h, --help                    Show this help message"
         echo -e "-v, --version                 Show the $NAME version"
 }
@@ -51,7 +52,7 @@ version() {
 ### MAIN PROGRAM                ###
 ###################################
 
-TEMP=`getopt -o isrhv --long install,source,remove,help,version -n 'juju' -- "$@"`
+TEMP=`getopt -o isrlhv --long install,source,remove,list,help,version -n 'juju' -- "$@"`
 
 if [ $? != 0 ] ; then echo -e "\033[1;31mError on parsing the command line. Try juju -h\033[0m" >&2 ; exit ; fi
 
@@ -61,6 +62,7 @@ eval set -- "$TEMP"
 OPT_SOURCE=false
 OPT_INSTALL=false
 OPT_REMOVE=false
+OPT_LIST=false
 OPT_HELP=false
 OPT_VERSION=false
 while true ; do
@@ -68,6 +70,7 @@ while true ; do
         -i|--install) OPT_INSTALL=true ; shift ;;
         -s|--source) OPT_SOURCE=true ; shift ;;
         -r|--remove) OPT_REMOVE=true ; shift ;;
+        -l|--list) OPT_LIST=true ; shift ;;
         -h|--help) OPT_HELP=true ; shift ;;
         -v|--version) OPT_VERSION=true ; shift ;;
         --) shift ; break ;;
@@ -84,13 +87,16 @@ for arg do
 done
 
 ################## CHECKING ERROR OPTIONS ###########
-if ( [ ! -z $OPT_AUTO ] ) && ( ! $OPT_INSTALL)
+if $OPT_SOURCE && ! $OPT_INSTALL
 then
-    echo -e "\033[1;31mPlease specify the --install option.\033[0m"; exit 127
+    echo -e "\033[1;31mPlease specify the --install option.\033[0m"
+	exit 127
 fi
 
-if $OPT_INSTALL && $OPT_REMOVE; then
-    echo -e "\033[1;31mConflict between the operations --install and --remove.\033[0m" ; exit 127
+if ! $OPT_INSTALL && ! $OPT_REMOVE && ! $OPT_LIST; then
+    echo -e "\033[1;31mPlease specify an action.\033[0m"
+	usage
+	exit 127
 fi
 
 ################ DEFINE ACTION ########################
@@ -104,6 +110,8 @@ elif $OPT_REMOVE; then
 	do
 		remove_package $pack
 	done
+elif $OPT_LIST; then
+	list_packages
 fi
 
 # vim: set ts=4 sw=4 noet:

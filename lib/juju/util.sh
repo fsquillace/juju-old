@@ -118,7 +118,6 @@ function extract(){
     [ "$format" == "" ]  && return
     local ext=".$(echo $format | cut -d '.' -f2- )"
     local nope=$(echo $format | cut -d '.' -f1 )
-    echo $ext $nope
 
     local original_dir=$PWD
     builtin cd $destdir

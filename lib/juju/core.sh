@@ -89,6 +89,13 @@ function check_integrity(){
     echo
 }
 
+function list_packages(){
+    ls $JUJU_PACKAGE_HOME/metadata/packages/ | \
+        while read pack; do
+            echo $pack
+        done
+}
+
 function download_pkgbuild(){
     # Download a PKGBUILD tarball, place the PKGBUILD and other files to the maindir
     # Usage: download_pkgbuild <pkgbase> <maindir>
@@ -235,9 +242,9 @@ function compile_package(){
         [ ! -z $sha512sums ] && (check_sum "$srcdir/$sourcename" ${sha512sums[i]} "sha512sum" || return 1)
 
         echo -e "\033[1;37mExtracting ...\033[0m"
-        # TODO try to substitute atool
-        # extract $srcdir/$sourcename $srcdir
-        atool -f --extract-to=$srcdir $srcdir/$sourcename
+        extract $srcdir/$sourcename $srcdir
+        # other way to extract is using atool
+        #atool -f --extract-to=$srcdir $srcdir/$sourcename
     done
 
     echo -e "\033[1;37mBuilding...\033[0m"
