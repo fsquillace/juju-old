@@ -34,6 +34,10 @@ To install tcpdump starting from the source code:
 
     $> juju -i -s tcpdump
 
+For listing the packages already installed:
+    $> juju -l
+    tcpdump
+
 For removing completely tcpdump from JuJu:
 
     $> juju -r tcpdump
