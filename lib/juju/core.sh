@@ -223,28 +223,52 @@ function compile_package(){
 
     for (( i=0; i<${#source[@]}; i++ ))
     do
-        # TODO handle the :: case
-        local s=${source[i]}
+        local source_string=${source[i]}
 
-        if [ -f "$s" ]; then
-            mv -f $s $srcdir/
-            local sourcename=$s
+        # Handle the :: delimiter
+        local sourcename=""
+        local urlname=""
+        if echo "$source_string" | grep ::
+        then
+            sourcename=$(echo "$source_string" | awk -F:: '{print $1}')
+            urlname=$(echo "$source_string" | awk -F:: '{print $2}')
         else
-            echo -e "\033[1;37mDownloading $s ...\033[0m"
-            wget -P $srcdir $s
-            local sourcename=$(basename $s)
+            sourcename=$(basename $source_string)
+            urlname=$source_string
+        fi
+
+        if [ -f "$sourcename" ]; then
+            mv -f $sourcename $srcdir/ || return 1
+        else
+            echo -e "\033[1;37mDownloading $sourcename ...\033[0m"
+            wget -O $srcdir/$sourcename "$urlname" || return 1
         fi
 
         # Check sum for each file downloaded
         echo -e "\033[1;37mChecking sum ...\033[0m"
-        [ ! -z $md5sums ] && (check_sum "$srcdir/$sourcename" ${md5sums[i]} "md5sum" || return 1)
-        [ ! -z $sha1sums ] && (check_sum "$srcdir/$sourcename" ${sha1sums[i]} "sha1sum" || return 1)
-        [ ! -z $sha256sums ] && (check_sum "$srcdir/$sourcename" ${sha256sums[i]} "sha256sum" || return 1)
-        [ ! -z $sha384sums ] && (check_sum "$srcdir/$sourcename" ${sha384sums[i]} "sha384sum" || return 1)
-        [ ! -z $sha512sums ] && (check_sum "$srcdir/$sourcename" ${sha512sums[i]} "sha512sum" || return 1)
+        if [ -n "$md5sums" ]
+        then
+            check_sum "$srcdir/$sourcename" ${md5sums[i]} "md5sum" || return 1
+        fi
+        if [ -n "$sha1sums" ]
+        then
+            check_sum "$srcdir/$sourcename" ${sha1sums[i]} "sha1sum" || return 1
+        fi
+        if [ -n "$sha256sums" ]
+        then
+            check_sum "$srcdir/$sourcename" ${sha256sums[i]} "sha256sum" || return 1
+        fi
+        if [ -n "$sha384sums" ]
+        then
+            check_sum "$srcdir/$sourcename" ${sha384sums[i]} "sha384sum" || return 1
+        fi
+        if [ -n "$sha512sums" ]
+        then
+            check_sum "$srcdir/$sourcename" ${sha512sums[i]} "sha512sum" || return 1
+        fi
 
         echo -e "\033[1;37mExtracting ...\033[0m"
-        extract $srcdir/$sourcename $srcdir
+        extract $srcdir/$sourcename $srcdir || return 1
         # other way to extract is using atool
         #atool -f --extract-to=$srcdir $srcdir/$sourcename
     done

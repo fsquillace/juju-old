@@ -178,7 +178,7 @@ function check_sum(){
     [ ! -z $3 ] && sum_command="$3"
     [ "$checksum" == "SKIP" ] && return 0
     local sum=$($sum_command $filename | awk '{print $1}')
-    if [ $sum != "$checksum" ]; then
+    if [ "$sum" != "$checksum" ]; then
         echo -e "\033[1;31mError: Not a correct checksum for $(basename $filename)\033[0m"
         return 1
     fi
