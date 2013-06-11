@@ -90,6 +90,7 @@ function check_integrity(){
 }
 
 function list_packages(){
+    [ ! -d $JUJU_PACKAGE_HOME/metadata/packages ] && return
     ls $JUJU_PACKAGE_HOME/metadata/packages/ | \
         while read pack; do
             echo $pack
@@ -222,6 +223,7 @@ function compile_package(){
 
     for (( i=0; i<${#source[@]}; i++ ))
     do
+        # TODO handle the :: case
         local s=${source[i]}
 
         if [ -f "$s" ]; then
