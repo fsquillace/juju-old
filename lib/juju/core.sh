@@ -374,7 +374,8 @@ function install_package(){
         echoerr -e "\033[1;33mWarn: pkgbase field wasn't found. Trying using pkgid instead\033[0m"
         pkgbase=$pkgid
     fi
-    maindir=$(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX) #/juju_pkg_${pkgid}_$(date +"%Y%m%d-%H%M%S")
+    # use mktemp, a non portable way is: $(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX)
+    maindir=$(TMPDIR=/tmp mktemp -d -t juju.XXXXXXXXXX)
     # Old PKGBUILD version use startdir instead of maindir
     startdir=$maindir
     srcdir=$maindir/src
