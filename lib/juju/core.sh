@@ -25,13 +25,13 @@
 # Import util.sh first
 FILE="$(readlink -f ${BASH_ARGV[0]})"
 source "$(dirname ${BASH_ARGV[0]})/util.sh"
+source "$(dirname ${BASH_ARGV[0]})/locking.sh"
 
 ARCHS=('any' 'i686' 'x86_64')
 REPOS=("core" "extra" "community" "multilib" "testing" "community-testing" "multilib-testing")
 
 set -e
-# TODO make a general control of the main commands (wget, tar, etc)
-# TODO make a lock system
+# TODO make a general control of the main commands (wget, tar, etc) place a warn in case of no xz
 
 ################################ REPOSITORY SCRIPTS #######################################
 OFFICIAL_REPO="https://projects.archlinux.org"
@@ -367,7 +367,9 @@ function install_package(){
     #     which condition={'>=','<=','>','<','='}
     #     for example '>=5.4'
 
-    # TODO add a verbose option and ignore-errors option
+    # TODO add a verbose option
+
+    acquire $JUJU_PACKAGE_HOME/metadata/locks/main.lck
 
     local from_source=false
     [ -z "$2" ] || from_source=$2
@@ -390,13 +392,7 @@ function install_package(){
     pkgid=$1
     if [ -z "$pkgid" ]
     then
-        echoerr -e "\033[1;31mError: Package name not specified\033[0m"
-        return 128
-    fi
-    pkgbase=$(get_pkgbase $pkgid)
-    if [ "$pkgbase" == "" ]; then
-        echoerr -e "\033[1;33mWarn: pkgbase field wasn't found. Trying using pkgid instead\033[0m"
-        pkgbase=$pkgid
+        die "Error: Package name not specified"
     fi
     # use mktemp, a non portable way is: $(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX)
     maindir=$(TMPDIR=/tmp mktemp -d -t juju.XXXXXXXXXX)
@@ -411,15 +407,21 @@ function install_package(){
     mkdir -p $pkgdir
 
     # Trap for removing the directory when the script finished
+    # but do not do the rollback
     if [ -z "$JUJU_DEBUG" ] || [ "$JUJU_DEBUG" == "0" ]; then
-        trap "die $pkgid \"Error occurred when installing $pkgid\" false $maindir" EXIT QUIT ABRT KILL TERM INT
+        trap "die \"Error occurred when installing $pkgid\" \"\" $maindir" EXIT QUIT ABRT KILL TERM INT
     else
-        trap "die $pkgid \"Error occurred when installing $pkgid\" false \"\"" EXIT QUIT ABRT KILL TERM INT
+        trap "die \"Error occurred when installing $pkgid\" \"\" \"\"" EXIT QUIT ABRT KILL TERM INT
     fi
 
     builtin cd $maindir
 
-    download_pkgbuild $pkgbase $maindir || die $pkgid "Error: The package $pkgid doesn't exist neither in Official nor AUR repos"
+    pkgbase=$(get_pkgbase $pkgid)
+    if [ "$pkgbase" == "" ]; then
+        pkgbase=$pkgid
+    fi
+
+    download_pkgbuild $pkgbase $maindir || die "Error: The package $pkgid doesn't exist neither in Official nor AUR repos"
 
     # Before sourcing PKGBUILD ask if user want to change it
     local res=$(confirm_question "Do you want to change PKGBUILD file? (y/N)> ")
@@ -433,7 +435,7 @@ function install_package(){
     # Update pkgname variable
     if [ "${#pkgname[@]}" != "1" ]; then
         contains "${pkgname[@]}" "$pkgid" || \
-            die "$pkgid" "Error: The package name $pkgid doesn't belong to the package group $pkgbase"
+            die "Error: The package name $pkgid doesn't belong to the package group $pkgbase"
     fi
 
 
@@ -451,7 +453,7 @@ function install_package(){
     if [ -n "$vercondition" ]; then
         echo -e "\033[1;37mChecking versioning $pkgver $vercondition.\033[0m"
         check_version_condition "$pkgver" "$vercondition" \
-        || die $pkgid "Error: The package $pkgid doesn't match the version condition $vercondition"
+        || die "Error: The package $pkgid doesn't match the version condition $vercondition"
     fi
 
     # Check for the architecture and ask to continue
@@ -471,7 +473,7 @@ function install_package(){
     then
         local res=$(confirm_question "The architecture $myarch is not suitable for $pkgid package. Do you want to continue anyway? (Y/n)> ")
         if [ "$res" == "N" ] || [ "$res" == "n" ]; then
-            return 1
+            die
         fi
     fi
 
@@ -494,7 +496,7 @@ function install_package(){
         if [ "$res" == "Y" ] || [ "$res" == "y" ] || [ "$res" == "" ]; then
             installed_deps+=("'"$dep"'")
             /bin/bash -c "export JUJU_PACKAGE_HOME=$JUJU_PACKAGE_HOME; source $FILE; install_package \"$dep\" $from_source \"$depvercondition\"" || \
-                die $pkgid "Error: dependency package $dep not installed."
+                die "Error: dependency package $dep not installed."
         fi
 
         # Be sure to unset the variable
@@ -516,23 +518,27 @@ function install_package(){
             else
                 echoerr -e "\033[1;31mError: xz command doesn't exist (Try to install it first)\033[0m"
                 echo -e "\033[1;37mCompiling from source files...\033[0m"
-                compile_package || die $pkgid "Error when compiling the package $pkgid"
+                compile_package || die "Error when compiling the package $pkgid"
             fi
             builtin cd $OLDPWD
         else
-            echoerr -e "\033[1;33mWarn: pre-compiled package not available, compiling it...\033[0m"
-            compile_package || die $pkgid "Error when compiling the package $pkgid"
+            echoerr -e "\033[1;33mWarning: pre-compiled package not available, compiling it...\033[0m"
+            compile_package || die "Error when compiling the package $pkgid"
         fi
     else
         echo -e "\033[1;37mCompiling from source files...\033[0m"
-        compile_package || die $pkgid "Error when compiling the package $pkgid"
+        compile_package || die "Error when compiling the package $pkgid"
     fi
 
 
     echo -e "\033[1;37mInstalling into the system...\033[0m"
     # From now for any error roll back!
     trap - QUIT EXIT ABRT KILL TERM INT
-    trap "die $pkgid \"Error occurred when installing $pkgid\" true" ABRT KILL TERM INT
+    if [ -z "$JUJU_DEBUG" ] || [ "$JUJU_DEBUG" == "0" ]; then
+        trap "die \"Error occurred when installing $pkgid\" $pkgid $maindir" EXIT QUIT ABRT KILL TERM INT
+    else
+        trap "die \"Error occurred when installing $pkgid\" $pkgid \"\"" EXIT QUIT ABRT KILL TERM INT
+    fi
 
 
     # Check the .install file
@@ -548,7 +554,7 @@ function install_package(){
         local old_pkgver=$(/bin/bash -c "source $JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGBUILD; echo \$pkgver")
         type -t pre_upgrade &> /dev/null && pre_upgrade "$pkgver" "$old_pkgver"
         remove_package "${pkgid}" false &> /dev/null || \
-            echoerr -e "\033[1;33mWarn: Got an error when removing ${pkgid} old version. Continuing updating ${pkgid} anyway ...\033[0m"
+            echoerr -e "\033[1;33mWarning: Got an error when removing ${pkgid} old version. Continuing updating ${pkgid} anyway ...\033[0m"
     else
         type -t pre_install &> /dev/null && pre_install $pkgver
     fi
@@ -594,35 +600,39 @@ function install_package(){
     builtin cd $origin_wd
     trap - QUIT EXIT ABRT KILL TERM INT
 
+    release $JUJU_PACKAGE_HOME/metadata/locks/main.lck
     return 0
 }
 
 function die(){
 # Apply the rollback procedure and give the error message
-# $1: pkgname (mandatory) - str: package name
-# $2: msg (mandatory) - str: Message to print
-# $3: rollback (optional) - bool: (default false)
-# $4: maindir (optional) - str: build directory to get rid
+# $1: msg (optional - str: Message to print
+# $2: pkgname (optional) - str: package name to remove for rollback
+# $3: maindir (optional) - str: build directory to get rid
 
-    local pkgname=$1
-    local msg=$2
-    local rollback=false
-    [ -n "$3" ] && rollback=$3
+    local msg=""
+    [ -n "$1" ] && msg=$1
+    local pkgname=""
+    [ -n "$2" ] && pkgname=$2
     local maindir=""
-    [ -n  "$4" ] && maindir=$4
+    [ -n  "$3" ] && maindir=$3
 
-    echoerr -e "\033[1;31m$2\033[0m"
-    if $rollback
+    if [ "$msg" != "" ]
+    then
+        echoerr -e "\033[1;31m$msg\033[0m"
+    fi
+    if [ "$pkgname" != "" ]
     then
         echo -e "\033[1;37mExecuting rollback procedure...\033[0m"
-        remove_package $1 false  2> /dev/null && \
+        remove_package $pkgname false  2> /dev/null && \
             echo -e "\033[1;37mRollback procedure completed successfully\033[0m" || \
             echoerr -e "\033[1;31mRollback procedure failed\033[0m"
     fi
-    if [ "$4" != "" ]; then
+    if [ "$maindir" != "" ]; then
         rm -fr "$maindir"
     fi
 
+    release $JUJU_PACKAGE_HOME/metadata/locks/main.lck
     exit 1
 }
 
@@ -631,23 +641,18 @@ function remove_package(){
     #
     # Usage: remove_package <pkgname> [<jujudir>]
     # $1: name of the package
-    # $2: interactive (default true)
+    # $2: norollback (default true) - bool: specify if
+    #     the removal is for doing a rollback
 
     local pkgname=$1
-    if [ -z "$pkgname" ]
-    then
-        echoerr -e "\033[1;31mError: Package name not specified\033[0m"
-        return 128
-    fi
+    [ -z "$pkgname" ] && die "Error: Package name not specified"
 
-    local interactive=true
-    [ ! -z $2 ] && interactive=$2
+    local norollback=true
+    [ ! -z $2 ] && norollback=$2
 
-    if [ ! -d "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}" ]
-    then
-        echoerr -e "\033[1;31mError: The package $pkgname is not installed\033[0m"
-        return 1
-    fi
+    $norollback && acquire $JUJU_PACKAGE_HOME/metadata/locks/main.lck
+
+    [ ! -d "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}" ] && die "Error: The package $pkgname is not installed"
 
     # Delete the dependencies first
     source "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/PKGINFO"
@@ -657,18 +662,18 @@ function remove_package(){
         for dep in ${instdeps[@]}
         do
             local res="y"
-            $interactive && res=$(confirm_question "Do you want remove $dep package? (y/N)> ")
+            $norollback && res=$(confirm_question "Do you want remove $dep package? (y/N)> ")
             if [ "$res" == "y" ] || [ "$res" == "Y" ]; then
-                /bin/bash -c "source $FILE; remove_package $dep $JUJU_PACKAGE_HOME $interactive"
+                /bin/bash -c "source $FILE; remove_package $dep $JUJU_PACKAGE_HOME $norollback"
             fi
         done
     fi
 
     cat "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/FILES"
     local res="y"
-    $interactive && res=$(confirm_question "Do you want remove $pkgname package? (y/N)> ")
+    $norollback && res=$(confirm_question "Do you want remove $pkgname package? (y/N)> ")
     if [ "$res" == "n" ] || [ "$res" == "N" ] || [ "$res" == "" ]; then
-        return 1
+        die
     fi
 
     # Check the .install file
@@ -695,13 +700,15 @@ function remove_package(){
     # Delete the metadata
     if ! rm -r -f "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}"
     then
-        echoerr -e "\033[1;31mError: Metadata for $pkgname were not removed\033[0m"
-        return 1
+        die "Error: Metadata for $pkgname were not removed"
     fi
 
     type -t post_remove &> /dev/null && post_remove "$old_pkgver"
 
     echo -e "\033[1;37m$pkgname removed successfully\033[0m"
+
+    release $JUJU_PACKAGE_HOME/metadata/locks/main.lck
+
     return 0
 }
 
