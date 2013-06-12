@@ -31,7 +31,6 @@ ARCHS=('any' 'i686' 'x86_64')
 REPOS=("core" "extra" "community" "multilib" "testing" "community-testing" "multilib-testing")
 
 set -e
-# TODO make a general control of the main commands (wget, tar, etc) place a warn in case of no xz
 
 ################################ REPOSITORY SCRIPTS #######################################
 OFFICIAL_REPO="https://projects.archlinux.org"
@@ -89,12 +88,32 @@ function check_integrity(){
     echo
 }
 
-function list_packages(){
+function list_package(){
+# List the packages installed in local repo.
+# If a package name is provided it lists the file contained in the
+# package
+#
+# $1: pkgname (optional) - str: the package name
+#
+
     [ ! -d $JUJU_PACKAGE_HOME/metadata/packages ] && return
-    ls $JUJU_PACKAGE_HOME/metadata/packages/ | \
-        while read pack; do
-            echo $pack
-        done
+
+    local pkgname=""
+    [ -n "$1" ] && pkgname="$1"
+
+    if [ "$pkgname" != "" ]
+    then
+        if [ ! -f $JUJU_PACKAGE_HOME/metadata/packages/$pkgname/FILES ]; then
+            echoerr -e "\033[1;31mError: $pkgname is not installed\033[0m"
+            return 128
+        fi
+        cat $JUJU_PACKAGE_HOME/metadata/packages/$pkgname/FILES
+    else
+        ls $JUJU_PACKAGE_HOME/metadata/packages/ | \
+            while read pack; do
+                echo $pack
+            done
+    fi
 }
 
 function download_pkgbuild(){
@@ -144,7 +163,8 @@ function download_pkgbuild_from_aur(){
     echo "$json_info" | grep "URLPath" &> /dev/null || return 1
     local pathURL=$(echo $json_info | awk -F [,:\"] '{c=1; while(var!="URLPath"){var=$c;c++}; print $(c+2)}')
 
-    wget --no-check-certificate -P $maindir $(echo ${AUR_URL}${pathURL} | sed 's/\\//g')
+    wget --no-check-certificate -P $maindir $(echo ${AUR_URL}${pathURL} | tr -d "\\\\")
+
     # Extract the PKGBUILD&co in the main directory
     tar -C $maindir -xzvf ${pkgbase}.tar.gz
     mv $maindir/$pkgbase/* . && rm -fr $maindir/$pkgbase
@@ -172,11 +192,11 @@ function download_pkgbuild_from_official(){
     fi
 
     # Get the url list of file to download
-    local list=$(echo "$xml_info" | grep -E -o "href\s*=\s*.*>" | cut -d \' -f2 | sed -e 's,^,'"$OFFICIAL_REPO"',g' | xargs)
+    local list=$(echo "$xml_info" | grep -E -o "href\s*=\s*.*>" | cut -d \' -f2 | awk -v q=$OFFICIAL_REPO '{ print q$0 }' | xargs)
 
     for w in $list; do
         # Get the filename from the url
-        local name=$(echo "$w" | sed -e 's,^'"$OFFICIAL_REPO"'/svntogit/'"$repo"'.git/plain/trunk/,,g' -e 's\?.*\\g' -e 's,'"$OFFICIAL_REPO"'/svntogit/'"$repo"'.git/plain/,,g' )
+        local name=$(echo "$w" | awk -F ? '{print $1}' | awk -v q="$OFFICIAL_REPO/svntogit/${repo}.git/plain/trunk/" '{gsub(q, "") ; print $0}' | awk -v q="$OFFICIAL_REPO/svntogit/${repo}.git/plain/" '{gsub(q, "") ; print $0}')
         if [ "$name" != "" ]; then
             builtin cd $maindir
             wget --no-check-certificate -P "$maindir" -O $name $w
@@ -274,20 +294,38 @@ function compile_package(){
     done
 
     echo -e "\033[1;37mBuilding...\033[0m"
+    # TODO try a better way for handling error (maybe not 'set -e'?)
     builtin cd $srcdir
-    [ "$(type -t pkgver &> /dev/null)" == "function" ] && pkgver
+    if [ "$(type -t pkgver &> /dev/null)" == "function" ]; then
+        pkgver || return 1
+    fi
     builtin cd $srcdir
-    type -t prepare &> /dev/null && prepare
+    if type -t prepare &> /dev/null
+    then
+        prepare || return 1
+    fi
     builtin cd $srcdir
-    type -t build &> /dev/null && build # && echoerr "Error: build function not worked."; return 1
+    if type -t build &> /dev/null
+    then
+        build || return 1 # && echoerr "Error: build function not worked."; return 1
+    fi
     builtin cd $srcdir
-    type -t check &> /dev/null && check
+    if type -t check &> /dev/null
+    then
+        check || return 1
+    fi
 
     echo -e "\033[1;37mPackaging...\033[0m"
     builtin cd $srcdir
-    type -t package &> /dev/null && package # && echoerr "Error: package function not worked."; return 1
+    if type -t package &> /dev/null
+    then
+        package || return 1 # && echoerr "Error: package function not worked."; return 1
+    fi
     builtin cd $srcdir
-    type -t package_$pkgname &> /dev/null && package_$pkgname
+    if type -t package_$pkgname &> /dev/null
+    then
+        package_$pkgname || return 1
+    fi
 
     return 0
 }

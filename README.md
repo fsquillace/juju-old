@@ -9,7 +9,8 @@ inside your home directory (by default is ~/.juju/).
 
 You can choose to install the package using either the pre-compiled packages or from the source code. The available
 pre-compiled packages are for i686 and x86\_64 architectures (in the future also armv{5,6,7} for your raspberry pi ;) ).
-JuJu was designed to be a lightweight program written completely in bash in order to get compatibility with many systems.
+JuJu was designed to be a lightweight program in order to get compatibility with many systems.
+The list of the main dependencies are: 'bash', 'wget' and 'tar'. That's it!
 
 There are several reasons to use JuJu instead of a traditional package manager. I just want to mention few of them:
 
@@ -17,10 +18,11 @@ There are several reasons to use JuJu instead of a traditional package manager. 
     it is better to keep the system in order to be as simple as possible without installing further packages as root.
     With JuJu you can install your packages inside your own home directory without affecting the performance or stability of your
     system.
-2. You can create your own GNU/Linux distribution from scratch. You can follow the Linux from Scratch guide
+2. You do not need to get root permissions for installing a package.
+3. You can create your own GNU/Linux distribution from scratch. You can follow the Linux from Scratch guide
     (http://www.linuxfromscratch.org/lfs/) and install each packages mentioned into the guide using JuJu.
-3. JuJu is a weak dependency package manager that allow the user to choose if the package dependencies need to be installed.
-4. To get easily your vim plugins, python libraries and more for every host you are logged in.
+4. JuJu is a weak dependency package manager that allow the user to choose if the package dependencies need to be installed.
+5. To get easily your vim plugins, python libraries and more for every host you are logged in.
 
 ## Quickstart
 After installing JuJu (See next section) install/remove a package like `tcpdump` is extremely easy.
@@ -37,6 +39,13 @@ For listing the packages already installed:
 
     $> juju -l
     tcpdump
+
+For listing the content of the package installed:
+
+    $> juju -l tcpdump
+    /usr/bin/tcpdump
+    /usr/share/licenses/tcpdump/LICENSE
+    ...
 
 For removing completely tcpdump from JuJu:
 
@@ -90,7 +99,7 @@ TODO ANSWER
 
 2. I have installed a python library (or vim plugin) but the system doesn't see it. It says "no module named 'modulename'".
 
-This is because JuJu need to update the PYTHONPATH or the vim runtimepath with the new directories created after the
+This is because JuJu need to update the 'PYTHONPATH' or the vim runtimepath with the new directories created after the
 installation of the package.
 To get it updated just re-source jujuenv:
 

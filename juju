@@ -19,7 +19,7 @@
 #
 
 NAME='juju'
-VERSION='0.3.6'
+VERSION='0.4.7'
 
 source "$(dirname $0)/lib/juju/core.sh"
 
@@ -36,7 +36,8 @@ usage() {
 		echo -e "\tOptions:"
         echo -e "\t-s, --source                Take the source code and compile it"
 		echo -e "-r, --remove <package(s)>     Remove the package(s) in ${JUJU_PACKAGE_HOME}"
-		echo -e "-l, --list                    List the packages installed in ${JUJU_PACKAGE_HOME}"
+		echo -e "-l, --list [<package(s)>]     List the packages installed in ${JUJU_PACKAGE_HOME}"
+		echo -e "                              or the files if the package(s) are specified"
         echo -e "-h, --help                    Show this help message"
         echo -e "-v, --version                 Show the $NAME version"
 }
@@ -74,7 +75,7 @@ while true ; do
         -h|--help) OPT_HELP=true ; shift ;;
         -v|--version) OPT_VERSION=true ; shift ;;
         --) shift ; break ;;
-        *) echo -e "\033[1;31mInternal error!\033[0m" ; exit 1 ;;
+        *) echoerr -e "\033[1;31mInternal error!\033[0m" ; exit 1 ;;
     esac
 done
 
@@ -85,6 +86,17 @@ ARGS=()
 for arg do
     ARGS+=($arg)
 done
+
+############## CHECKING ESSENTIAL  COMMANDS ####################
+# Check if the essentials commands are installed (wget and tar)
+if ! which wget &> /dev/null || ! which tar &> /dev/null
+then
+    echo -e "\033[1;31mError: wget and tar commands are essentials for JuJu. Get them first.\033[0m"
+	exit 1
+fi
+
+# TODO add --essentials option and essential.sh module for getting awk,xz and grep
+
 
 ################## CHECKING ERROR OPTIONS ###########
 if $OPT_SOURCE && ! $OPT_INSTALL
@@ -101,17 +113,25 @@ fi
 
 ################ DEFINE ACTION ########################
 if $OPT_INSTALL; then
-	for pack in $ARGS
+	for pack in ${ARGS[@]}
 	do
 		install_package $pack $OPT_SOURCE
 	done
 elif $OPT_REMOVE; then
-	for pack in $ARGS
+	for pack in ${ARGS[@]}
 	do
 		remove_package $pack
 	done
 elif $OPT_LIST; then
-	list_packages
+	if [ "${#ARGS[@]}" != "0" ]
+	then
+		for pack in ${ARGS[@]}
+		do
+			list_package $pack
+		done
+	else
+		list_package
+	fi
 fi
 
 # vim: set ts=4 sw=4 noet:
