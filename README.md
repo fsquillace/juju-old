@@ -5,7 +5,7 @@
 **JuJu** is a package manager that can be used for every GNU/Linux distribution.
 
 JuJu is able to get the packages from the ArchLinux Official and AUR repositories and install them
-directly in your home directory (by default is ~/.juju/).
+inside your home directory (by default is ~/.juju/).
 
 You can choose to install the package using either the pre-compiled packages or from the source code. The available
 pre-compiled packages are for i686 and x86\_64 architectures (in the future also armv{5,6,7} for your raspberry pi ;) ).
@@ -14,8 +14,8 @@ JuJu was designed to be a lightweight program written completely in bash in orde
 There are several reasons to use JuJu instead of a traditional package manager. I just want to mention few of them:
 
 1. Consider to have a server in production which run an important service. Generally,
-    it is better to keep the system has to be as simple as possible without installing further packages as root.
-    With JuJu you can install your packages in your own folder directory without affecting the performance or stability of your
+    it is better to keep the system in order to be as simple as possible without installing further packages as root.
+    With JuJu you can install your packages inside your own home directory without affecting the performance or stability of your
     system.
 2. You can create your own GNU/Linux distribution from scratch. You can follow the Linux from Scratch guide
     (http://www.linuxfromscratch.org/lfs/) and install each packages mentioned into the guide using JuJu.
@@ -24,7 +24,6 @@ There are several reasons to use JuJu instead of a traditional package manager. 
 
 ## Quickstart
 After installing JuJu (See next section) install/remove a package like `tcpdump` is extremely easy.
-Type the following:
 
 To install tcpdump:
 

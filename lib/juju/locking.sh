@@ -19,7 +19,6 @@
 #
 
 # Import util.sh first
-FILE="$(readlink -f ${BASH_ARGV[0]})"
 source "$(dirname ${BASH_ARGV[0]})/util.sh"
 
 function acquire(){

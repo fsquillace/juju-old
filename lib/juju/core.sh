@@ -62,7 +62,7 @@ function get_pkgbase(){
     local myarch=$(uname -m)
     for repo in "${REPOS[@]}"
     do
-        local pbase=$(wget -q -O - https://www.archlinux.org/packages/${repo}/$myarch/$pkgname/ | grep "Source Files" | awk -F\" '{print $2}' | awk -F/ '{ print $NF }')
+        local pbase=$(wget --no-check-certificate -q -O - https://www.archlinux.org/packages/${repo}/$myarch/$pkgname/ | grep "Source Files" | awk -F\" '{print $2}' | awk -F/ '{ print $NF }')
         if [ "$pbase" != "" ]; then
             echo "$pbase"
             return
@@ -74,7 +74,7 @@ function search_package(){
     # Search a package into the repositoriesries AUR and Official
     # $1: package name
     # return: 0 if package found, 1 otherwise
-    local DATA=$(wget -q -O - "${AUR_SEARCH_URL}type=search&arg=yaourt")
+    local DATA=$(wget --no-check-certificate -q -O - "${AUR_SEARCH_URL}type=search&arg=yaourt")
 }
 
 function info_package(){
@@ -140,11 +140,11 @@ function download_pkgbuild_from_aur(){
     # Ensure to have the absolute paths
     local maindir=$(readlink -f $2)
 
-    local json_info=$(wget -q -O - "$AUR_URL/rpc.php?type=info&arg=$pkgbase")
+    local json_info=$(wget --no-check-certificate -q -O - "$AUR_URL/rpc.php?type=info&arg=$pkgbase")
     echo "$json_info" | grep "URLPath" &> /dev/null || return 1
     local pathURL=$(echo $json_info | awk -F [,:\"] '{c=1; while(var!="URLPath"){var=$c;c++}; print $(c+2)}')
 
-    wget -P $maindir $(echo ${AUR_URL}${pathURL} | sed 's/\\//g')
+    wget --no-check-certificate -P $maindir $(echo ${AUR_URL}${pathURL} | sed 's/\\//g')
     # Extract the PKGBUILD&co in the main directory
     tar -C $maindir -xzvf ${pkgbase}.tar.gz
     mv $maindir/$pkgbase/* . && rm -fr $maindir/$pkgbase
@@ -165,7 +165,7 @@ function download_pkgbuild_from_official(){
     # Ensure to have the absolute paths
     local maindir=$(readlink -f $2)
 
-    local xml_info=$(wget -q -O - "$OFFICIAL_REPO/svntogit/$repo.git/plain/trunk/?h=packages/$1")
+    local xml_info=$(wget --no-check-certificate -q -O - "$OFFICIAL_REPO/svntogit/$repo.git/plain/trunk/?h=packages/$1")
     if [ "$xml_info" == "" ]; then
         # Package not in this repository
         return 1
@@ -179,7 +179,7 @@ function download_pkgbuild_from_official(){
         local name=$(echo "$w" | sed -e 's,^'"$OFFICIAL_REPO"'/svntogit/'"$repo"'.git/plain/trunk/,,g' -e 's\?.*\\g' -e 's,'"$OFFICIAL_REPO"'/svntogit/'"$repo"'.git/plain/,,g' )
         if [ "$name" != "" ]; then
             builtin cd $maindir
-            wget -P "$maindir" -O $name $w
+            wget --no-check-certificate -P "$maindir" -O $name $w
             builtin cd -
         fi
     done
@@ -208,7 +208,7 @@ function download_precompiled_package(){
     local ret="1"
     for (( i=0; i<${#repos[@]}; i++ ))
     do
-        wget -P "$maindir" -O ${pkgname}-${pkgver}-${arch}.pkg.tar.xz https://www.archlinux.org/packages/${repos[i]}/${arch}/${pkgname}/download/
+        wget --no-check-certificate -P "$maindir" -O ${pkgname}-${pkgver}-${arch}.pkg.tar.xz https://www.archlinux.org/packages/${repos[i]}/${arch}/${pkgname}/download/
         ret=$?
         [ "$ret" == "0" ] && break
     done
@@ -241,7 +241,7 @@ function compile_package(){
             mv -f $sourcename $srcdir/ || return 1
         else
             echo -e "\033[1;37mDownloading $sourcename ...\033[0m"
-            wget -O $srcdir/$sourcename "$urlname" || return 1
+            wget --no-check-certificate -O $srcdir/$sourcename "$urlname" || return 1
         fi
 
         # Check sum for each file downloaded
@@ -368,8 +368,9 @@ function install_package(){
     #     for example '>=5.4'
 
     # TODO add a verbose option
+    # TODO add required by field
 
-    acquire $JUJU_PACKAGE_HOME/metadata/locks/main.lck
+    #acquire $JUJU_PACKAGE_HOME/metadata/locks/main.lck
 
     local from_source=false
     [ -z "$2" ] || from_source=$2
@@ -589,6 +590,8 @@ function install_package(){
     echo -e "\033[1;37m$pkgid installed successfully\033[0m"
 
     builtin cd $JUJU_PACKAGE_HOME/root
+    # Wait a while to be sure all the files are properly stored
+    sleep 2
     if $updated; then
         type -t post_upgrade &> /dev/null && post_upgrade $pkgver $old_pkgver
     else
@@ -600,7 +603,7 @@ function install_package(){
     builtin cd $origin_wd
     trap - QUIT EXIT ABRT KILL TERM INT
 
-    release $JUJU_PACKAGE_HOME/metadata/locks/main.lck
+    #release $JUJU_PACKAGE_HOME/metadata/locks/main.lck
     return 0
 }
 
@@ -632,7 +635,7 @@ function die(){
         rm -fr "$maindir"
     fi
 
-    release $JUJU_PACKAGE_HOME/metadata/locks/main.lck
+    #release $JUJU_PACKAGE_HOME/metadata/locks/main.lck
     exit 1
 }
 
@@ -650,7 +653,7 @@ function remove_package(){
     local norollback=true
     [ ! -z $2 ] && norollback=$2
 
-    $norollback && acquire $JUJU_PACKAGE_HOME/metadata/locks/main.lck
+    #$norollback && acquire $JUJU_PACKAGE_HOME/metadata/locks/main.lck
 
     [ ! -d "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}" ] && die "Error: The package $pkgname is not installed"
 
@@ -707,7 +710,7 @@ function remove_package(){
 
     echo -e "\033[1;37m$pkgname removed successfully\033[0m"
 
-    release $JUJU_PACKAGE_HOME/metadata/locks/main.lck
+    #release $JUJU_PACKAGE_HOME/metadata/locks/main.lck
 
     return 0
 }
