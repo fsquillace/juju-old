@@ -29,22 +29,26 @@ then
 fi
 
 
-export PATH=$PATH:${HOME}/.jujup/:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin
+export PATH=$PATH:${HOME}/.jujup/bin:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib
 
 export MANPATH=$MANPATH:$JUJU_PACKAGE_HOME/root/usr/share/man
 
 # Update runtimepath variable
-if ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/* &> /dev/null; then
-    vimpaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/* | awk 'BEGIN{ORS=","}{print $0}')
-    vimafterpaths=""
-    if ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/*/after &> /dev/null; then
-        vimafterpaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/*/after | awk 'BEGIN{ORS=","}{print $0}')
+function vim(){
+    if ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/* &> /dev/null; then
+        local vimpaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/* | awk 'BEGIN{ORS=","}{print $0}')
+        local vimafterpaths=""
+        if ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/*/after &> /dev/null; then
+            vimafterpaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/*/after | awk 'BEGIN{ORS=","}{print $0}')
+        fi
+        /usr/bin/vim -c "set runtimepath+=$vimpaths" -c "set runtimepath+=$vimafterpaths" $@
+    else
+        vim $@
     fi
-    alias vim="vim -c \"set runtimepath+=$vimpaths\" -c \"set runtimepath+=$vimafterpaths\""
-    unset vimpaths
-fi
+}
+
 
 # Update PYTHONPATH variable
 if ls -d $JUJU_PACKAGE_HOME/root/usr/lib/python* &> /dev/null; then
@@ -52,3 +56,5 @@ if ls -d $JUJU_PACKAGE_HOME/root/usr/lib/python* &> /dev/null; then
     export PYTHONPATH=$PYTHONPATH:$pypaths
     unset pypaths
 fi
+
+$@

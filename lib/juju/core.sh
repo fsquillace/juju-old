@@ -48,6 +48,9 @@ then
     exit 128
 fi
 
+# Update PATH and LD_LIBRARY_PATH for jujubox
+PATH=$JUJU_PACKAGE_HOME/jujuboxroot/usr/local/bin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/bin:$JUJU_PACKAGE_HOME/jujuboxroot/bin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/local/sbin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/sbin:$JUJU_PACKAGE_HOME/jujuboxroot/sbin:$PATH
+LD_LIBRARY_PATH=$JUJU_PACKAGE_HOME/jujuboxroot/lib:$JUJU_PACKAGE_HOME/jujuboxroot/usr/lib:$LD_LIBRARY_PATH:$LD_LIBRARY_PATH
 
 [ -z $JUJU_DEBUG ] && JUJU_DEBUG=0
 

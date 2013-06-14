@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# This file is part of JuJu: The universal GNU/Linux package manager
+#
+# Copyright (c) 2012-2013 Filippo Squillace <feel.squally@gmail.com>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Library General Public License as published
+# by the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+if [ -z "$JUJU_PACKAGE_HOME" ]
+then
+    JUJU_PACKAGE_HOME="$HOME/.juju"
+fi
+
+JUJU_PACKAGE_HOME=`readlink -f $JUJU_PACKAGE_HOME`
+if [ ! -d "$JUJU_PACKAGE_HOME" ]
+then
+    echo -e "\033[1;31mError: The path '$JUJU_PACKAGE_HOME' doesn't exist\033[0m"
+    exit 128
+fi
+
+function download_jujubox(){
+    # $1: arch (mandatory) - str: architecture
+
+    cd $JUJU_PACKAGE_HOME/jujuboxroot
+    local $arch=$1
+    wget http://juju.alwaysdata.net/jujubox-${arch}.tar
+    tar xvf jujubox-${arch}.tar
+    rm -f jujubox-${arch}.tar
+    cd $OLDPWD
+}
+
+function get_jujubox(){
+
+    # Create the dirs
+    mkdir -p $JUJU_PACKAGE_HOME/jujuboxroot
+
+    local arch=`uname -m`
+    case "$arch" in
+        x86_64|i686) download_jujubox $arch ;;
+        *) echo -e "\033[1;31mError: jujubox not available for $arch architecture\033[0m" ; exit 1
+    esac
+
+}
+
+get_jujubox
