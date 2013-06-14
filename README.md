@@ -10,7 +10,7 @@ inside your home directory (by default is ~/.juju/).
 You can choose to install the package using either the pre-compiled packages or from the source code. The available
 pre-compiled packages are for i686 and x86\_64 architectures (in the future also armv{5,6,7} for your raspberry pi ;) ).
 JuJu was designed to be a lightweight program in order to get compatibility with many systems.
-The list of the main dependencies are: 'bash', 'wget' and 'tar'. That's it!
+The list of the main dependencies are: 'bash>=4.0', 'wget' and 'tar'. That's it!
 
 There are several reasons to use JuJu instead of a traditional package manager. I just want to mention few of them:
 
@@ -55,29 +55,40 @@ Find out more options by typing:
 
     $> juju --help
 
-Execute your program:
+Execute your commands in two ways, wrapping the command with jujuenv:
 
+    $> jujuenv tcpdump --help
+
+Or setting the environment variables inside the shell by using 'source jujuenv' command:
+
+    $> source jujuenv
     $> sudo tcpdump -i wlan0 'tcp and dst port 80'
     $> man tcpdump
 
 Wowww!
+
+The 'jujuenv' file is used to get updated most of the environment variables such as PATH, LD\_LIBRARY\_PATH,
+    MANPATH, etc. It also update the variables PYTHONPATH and VIMRUNTIME to get easily installed your favourite python libraries and
+    vim plugins.
 
 For the moment it is not implemented the functionality for searching packages. Anyway, you can search for
 packages going directly to the ArchLinux website Official https://www.archlinux.org/packages/ and AUR
 https://aur.archlinux.org/ repositories.
 
 ## Installation
-Clone JuJu in ~/.jujup directory:
+You can get JuJu from git or from the tarball.
+If you want to get JuJu from git, clone JuJu in ~/.jujup directory:
 
     $> git clone git://github.com/fsquillace/juju ~/.jujup
 
-Source jujuenv or place the following line in your .bashrc file:
+Otherwise you can get it from the tarball:
 
-    $> source ~/.jujup/lib/juju/jujuenv
+    $> wget https://github.com/fsquillace/juju/archive/main.tar.gz
+    $> tar xzvf main.tar.gz && mv juju-main/ ~/.jujup
 
-The 'jujuenv' file is used to get updated most of the environment variables such as PATH, LD\_LIBRARY\_PATH,
-    MANPATH, etc. It also update the variables PYTHONPATH and VIMRUNTIME to get easily your favourite python libraries and
-    vim plugins.
+Set the PATH variable in your shell (or in ~/.bashrc file):
+
+    $> export PATH=$PATH:$HOME/.jujup/bin
 
 ## Advanced use
 If you want to place the packages in a particular folder different from the default one (~/.juju),
@@ -90,6 +101,15 @@ After installing the package the temporary directory is automatically removed. I
 purposes just type:
 
     $> JUJU_DEBUG=1 juju -i <package_name>
+
+### JuJu dependencies
+    Apart the main dependencies (bash, tar and wget), Juju has few other dependencies that can be fixed
+    by getting the jujubox. jujubox is a minimal script that retrieve a tarball of a package set (awk, grep and xz)
+    that will be installed into the juju repo local from a remote repository.
+    Usually these dependencies are available in many *nix system. However, in case
+    your system does not have one of these dependencies you can get it by typing:
+
+    $> jujubox
 
 ## Troubleshooting
 
