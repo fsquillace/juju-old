@@ -81,7 +81,7 @@ If you want to get JuJu from git, clone JuJu in ~/.jujup directory:
 
     $> git clone git://github.com/fsquillace/juju ~/.jujup
 
-Otherwise you can get it from the tarball:
+Otherwise download the tarball:
 
     $> wget https://github.com/fsquillace/juju/archive/main.tar.gz
     $> tar xzvf main.tar.gz && mv juju-main/ ~/.jujup
@@ -103,11 +103,11 @@ purposes just type:
     $> JUJU_DEBUG=1 juju -i <package_name>
 
 ### JuJu dependencies
-    Apart the main dependencies (bash, tar and wget), Juju has few other dependencies that can be fixed
-    by getting the jujubox. jujubox is a minimal script that retrieve a tarball of a package set (awk, grep and xz)
-    that will be installed into the juju repo local from a remote repository.
-    Usually these dependencies are available in many *nix system. However, in case
-    your system does not have one of these dependencies you can get it by typing:
+Apart the main dependencies (bash, tar and wget), Juju has few other dependencies that can be fixed
+through the jujubox. jujubox is a minimal script that retrieves a tarball of a package set (awk, grep and xz)
+that will be installed into the juju repo local from a remote repository.
+Usually these dependencies are available in many \*nix systems. However, in case
+your system does not have one of these dependencies you can get it by typing:
 
     $> jujubox
 

@@ -95,9 +95,6 @@ then
 	exit 1
 fi
 
-# TODO add --essentials option and essential.sh module for getting awk,xz and grep
-
-
 ################## CHECKING ERROR OPTIONS ###########
 if $OPT_SOURCE && ! $OPT_INSTALL
 then
