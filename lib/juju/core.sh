@@ -49,8 +49,15 @@ then
 fi
 
 # Update PATH and LD_LIBRARY_PATH for jujubox
-PATH=$JUJU_PACKAGE_HOME/jujuboxroot/usr/local/bin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/bin:$JUJU_PACKAGE_HOME/jujuboxroot/bin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/local/sbin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/sbin:$JUJU_PACKAGE_HOME/jujuboxroot/sbin:$PATH
-LD_LIBRARY_PATH=$JUJU_PACKAGE_HOME/jujuboxroot/lib:$JUJU_PACKAGE_HOME/jujuboxroot/usr/lib:$LD_LIBRARY_PATH:$LD_LIBRARY_PATH
+# Search for the commands juju dependencies in this order: jujubox, juju local repo, root system
+PATH=$JUJU_PACKAGE_HOME/jujuboxroot/usr/local/bin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/bin:$JUJU_PACKAGE_HOME/jujuboxroot/bin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/local/sbin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/sbin:$JUJU_PACKAGE_HOME/jujuboxroot/sbin:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin:$PATH
+LD_LIBRARY_PATH=$JUJU_PACKAGE_HOME/jujuboxroot/lib:$JUJU_PACKAGE_HOME/jujuboxroot/usr/lib:$LD_LIBRARY_PATH:$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib:$LD_LIBRARY_PATH:$LD_LIBRARY_PATH
+
+if ! which wget &> /dev/null || ! which grep &> /dev/null || ! which bash &> /dev/null || ! which tar &> /dev/null || ! which awk &> /dev/null
+then
+    echoerr -e "\033[1;31mError: One of the JuJu dependencies was not found. Try execute: jujubox\033[0m"
+    exit 128
+fi
 
 [ -z $JUJU_DEBUG ] && JUJU_DEBUG=0
 
@@ -436,6 +443,9 @@ function install_package(){
     then
         die "Error: Package name not specified"
     fi
+    # the package sh is an alias of bash
+    [ "$pkgid" == "sh" ] && pkgid="bash"
+
     # use mktemp, a non portable way is: $(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX)
     maindir=$(TMPDIR=/tmp mktemp -d -t juju.XXXXXXXXXX)
     # Old PKGBUILD version use startdir instead of maindir

@@ -35,7 +35,7 @@ function download_jujubox(){
 
     cd $JUJU_PACKAGE_HOME/jujuboxroot
     local $arch=$1
-    wget http://juju.alwaysdata.net/jujubox-${arch}.tar
+    wget https://dl.dropboxusercontent.com/u/42449030/jujubox-${arch}.tar
     tar xvf jujubox-${arch}.tar
     rm -f jujubox-${arch}.tar
     cd $OLDPWD
