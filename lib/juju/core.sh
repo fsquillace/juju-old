@@ -48,10 +48,12 @@ then
     exit 128
 fi
 
-# Update PATH and LD_LIBRARY_PATH for jujubox
-# Search for the commands juju dependencies in this order: jujubox, juju local repo, root system
-PATH=$JUJU_PACKAGE_HOME/jujuboxroot/usr/local/bin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/bin:$JUJU_PACKAGE_HOME/jujuboxroot/bin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/local/sbin:$JUJU_PACKAGE_HOME/jujuboxroot/usr/sbin:$JUJU_PACKAGE_HOME/jujuboxroot/sbin:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin:$PATH
-LD_LIBRARY_PATH=$JUJU_PACKAGE_HOME/jujuboxroot/lib:$JUJU_PACKAGE_HOME/jujuboxroot/usr/lib:$LD_LIBRARY_PATH:$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib:$LD_LIBRARY_PATH:$LD_LIBRARY_PATH
+# Update PATH and LD_LIBRARY_PATH with the juju local repo
+# Search for the commands juju dependencies in this order: juju local repo, root system
+PATH=$PATH:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib
+
+LD_PRELOAD=$JUJU_PACKAGE_HOME/root/lib/ld-linux-x86-64.so.2
 
 if ! which wget &> /dev/null || ! which grep &> /dev/null || ! which bash &> /dev/null || ! which tar &> /dev/null || ! which awk &> /dev/null
 then

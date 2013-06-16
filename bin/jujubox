@@ -33,18 +33,17 @@ fi
 function download_jujubox(){
     # $1: arch (mandatory) - str: architecture
 
-    cd $JUJU_PACKAGE_HOME/jujuboxroot
+    mkdir -p $JUJU_PACKAGE_HOME
+
+    cd $JUJU_PACKAGE_HOME/
     local $arch=$1
-    wget https://dl.dropboxusercontent.com/u/42449030/jujubox-${arch}.tar
+    wget --no-check-certificate https://dl.dropboxusercontent.com/u/42449030/jujubox-${arch}.tar
     tar xvf jujubox-${arch}.tar
     rm -f jujubox-${arch}.tar
     cd $OLDPWD
 }
 
 function get_jujubox(){
-
-    # Create the dirs
-    mkdir -p $JUJU_PACKAGE_HOME/jujuboxroot
 
     local arch=`uname -m`
     case "$arch" in
