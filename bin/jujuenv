@@ -57,4 +57,11 @@ if ls -d $JUJU_PACKAGE_HOME/root/usr/lib/python* &> /dev/null; then
     unset pypaths
 fi
 
-$@
+if [ "$1" == "sudo" ]; then
+    shift
+    vars="$@"
+    su -p -c "$vars"
+    unset vars
+else
+    $@
+fi

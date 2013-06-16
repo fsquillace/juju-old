@@ -102,6 +102,27 @@ purposes just type:
 
     $> JUJU_DEBUG=1 juju -i <package_name>
 
+### Diagnosis
+
+When executing a command installed with JuJu, it could happen that some shared library are not detected
+neither from the JuJu local reposistory nor from the root system (/lib and /usr/lib).
+In this case to get the list of library dependencies for an executable you can type:
+
+    $> jujuenv ldd $(jujuenv which <executable>)
+
+In this way you can easily understand which library dependencies are missing and you can install them using JuJu.
+
+### Sudo access
+
+The sudo command doesn't allow to easily preserve the variables environment. For this reason every time the sudo command is used
+it will be replaced with su command. Therefore, the following command:
+
+    $> jujuenv sudo tcpdump -i wlan0
+
+is the same as:
+
+    $> su -p -c "jujuenv tcpdump -i wlan0"
+
 ### JuJu dependencies
 Apart the main dependencies (bash, tar and wget), Juju has few other dependencies that can be fixed
 through the jujubox. jujubox is a minimal script that retrieves a tarball of a package set (awk, grep and xz)
@@ -124,6 +145,10 @@ installation of the package.
 To get it updated just re-source jujuenv:
 
     $> source ~/.jujup/lib/juju/jujuenv
+
+3. Why do I get an error "cp: cannot overwrite directory ${HOME}/.juju/root/usr/sbin with non-directory" when I am installing 'filesystem' package?
+
+The 'filesystem' is a package that define the main directories of the Linux system. It is always useful to install 'filesystem' before any other packages that place files in the directories /lib, /lib64, /sbin, /bin.
 
 ## License
 Copyright (c) 2012-2013
