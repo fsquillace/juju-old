@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This file is part of JuJu: The universal GNU/Linux package manager
 #
@@ -22,17 +22,33 @@
 # https://wiki.archlinux.org/index.php/PKGBUILD
 # https://wiki.archlinux.org/index.php/Creating_Packages
 
-# Import util.sh first
+set -e
+
+################################ MAIN VARIABLES ##########################
 FILE="$(readlink -f ${BASH_ARGV[0]})"
+
+[ -z "$JUJU_PACKAGE_HOME" ]  && JUJU_PACKAGE_HOME="$HOME/.juju"
+JUJU_PACKAGE_HOME=$(readlink -f $JUJU_PACKAGE_HOME)
+mkdir -p "$JUJU_PACKAGE_HOME"
+
+[ -z $JUJU_DEBUG ] && JUJU_DEBUG=0
+
+# Update PATH and LD_LIBRARY_PATH with the juju local repo
+# Search for the commands juju dependencies in this order: juju local repo, root system
+PATH=$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin:$PATH
+
+LD_LIBRARY_PATH=$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib:$LD_LIBRARY_PATH
+
+################################ IMPORTS #################################
+# Define the variables for the dependency commands bash, wget, tar, which, awk, grep, xz, file
+source "$(dirname ${BASH_ARGV[0]})/essentials.sh"
 source "$(dirname ${BASH_ARGV[0]})/util.sh"
 source "$(dirname ${BASH_ARGV[0]})/locking.sh"
 
+################################ VARIABLES ####################################
 ARCHS=('any' 'i686' 'x86_64')
 REPOS=("core" "extra" "community" "multilib" "testing" "community-testing" "multilib-testing")
 
-set -e
-
-################################ REPOSITORY SCRIPTS #######################################
 OFFICIAL_REPO="https://projects.archlinux.org"
 OFFICIAL_PACKAGES_REPO="$OFFICIAL_REPO/svntogit/packages.git"
 OFFICIAL_COMMUNITY_REPO="$OFFICIAL_REPO/community.git"
@@ -40,28 +56,7 @@ OFFICIAL_COMMUNITY_REPO="$OFFICIAL_REPO/community.git"
 AUR_URL='http://aur.archlinux.org/'
 AUR_SEARCH_URL="$AUR_URL/rpc.php?"
 
-[ -z "$JUJU_PACKAGE_HOME" ]  && JUJU_PACKAGE_HOME="$HOME/.juju"
-JUJU_PACKAGE_HOME=$(readlink -f $JUJU_PACKAGE_HOME)
-if [ ! -d "$JUJU_PACKAGE_HOME" ]
-then
-    echoerr -e "\033[1;31mError: The path '$JUJU_PACKAGE_HOME' doesn't exist\033[0m"
-    exit 128
-fi
-
-# Update PATH and LD_LIBRARY_PATH with the juju local repo
-# Search for the commands juju dependencies in this order: juju local repo, root system
-PATH=$PATH:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib
-
-LD_PRELOAD=$JUJU_PACKAGE_HOME/root/lib/ld-linux-x86-64.so.2
-
-if ! which wget &> /dev/null || ! which grep &> /dev/null || ! which bash &> /dev/null || ! which tar &> /dev/null || ! which awk &> /dev/null
-then
-    echoerr -e "\033[1;31mError: One of the JuJu dependencies was not found. Try execute: jujubox\033[0m"
-    exit 128
-fi
-
-[ -z $JUJU_DEBUG ] && JUJU_DEBUG=0
+################################# MAIN FUNCTIONS ##############################
 
 function get_pkgbase(){
 # Return the pkgbase info starting from the pkgid.
@@ -73,7 +68,7 @@ function get_pkgbase(){
     local myarch=$(uname -m)
     for repo in "${REPOS[@]}"
     do
-        local pbase=$(wget --no-check-certificate -q -O - https://www.archlinux.org/packages/${repo}/$myarch/$pkgname/ | grep "Source Files" | awk -F\" '{print $2}' | awk -F/ '{ print $NF }')
+        local pbase=$($WGET --no-check-certificate -q -O - https://www.archlinux.org/packages/${repo}/$myarch/$pkgname/ | $GREP "Source Files" | $AWK -F\" '{print $2}' | $AWK -F/ '{ print $NF }')
         if [ "$pbase" != "" ]; then
             echo "$pbase"
             return
@@ -85,7 +80,7 @@ function search_package(){
     # Search a package into the repositoriesries AUR and Official
     # $1: package name
     # return: 0 if package found, 1 otherwise
-    local DATA=$(wget --no-check-certificate -q -O - "${AUR_SEARCH_URL}type=search&arg=yaourt")
+    local DATA=$($WGET --no-check-certificate -q -O - "${AUR_SEARCH_URL}type=search&arg=yaourt")
 }
 
 function info_package(){
@@ -171,14 +166,14 @@ function download_pkgbuild_from_aur(){
     # Ensure to have the absolute paths
     local maindir=$(readlink -f $2)
 
-    local json_info=$(wget --no-check-certificate -q -O - "$AUR_URL/rpc.php?type=info&arg=$pkgbase")
-    echo "$json_info" | grep "URLPath" &> /dev/null || return 1
-    local pathURL=$(echo $json_info | awk -F [,:\"] '{c=1; while(var!="URLPath"){var=$c;c++}; print $(c+2)}')
+    local json_info=$($WGET --no-check-certificate -q -O - "$AUR_URL/rpc.php?type=info&arg=$pkgbase")
+    echo "$json_info" | $GREP "URLPath" &> /dev/null || return 1
+    local pathURL=$(echo $json_info | $AWK -F [,:\"] '{c=1; while(var!="URLPath"){var=$c;c++}; print $(c+2)}')
 
-    wget --no-check-certificate -P $maindir $(echo ${AUR_URL}${pathURL} | tr -d "\\\\")
+    $WGET --no-check-certificate -P $maindir $(echo ${AUR_URL}${pathURL} | tr -d "\\\\")
 
     # Extract the PKGBUILD&co in the main directory
-    tar -C $maindir -xzvf ${pkgbase}.tar.gz
+    $TAR -C $maindir -xzvf ${pkgbase}.tar.gz
     mv $maindir/$pkgbase/* . && rm -fr $maindir/$pkgbase
 
 }
@@ -197,21 +192,21 @@ function download_pkgbuild_from_official(){
     # Ensure to have the absolute paths
     local maindir=$(readlink -f $2)
 
-    local xml_info=$(wget --no-check-certificate -q -O - "$OFFICIAL_REPO/svntogit/$repo.git/plain/trunk/?h=packages/$1")
+    local xml_info=$($WGET --no-check-certificate -q -O - "$OFFICIAL_REPO/svntogit/$repo.git/plain/trunk/?h=packages/$1")
     if [ "$xml_info" == "" ]; then
         # Package not in this repository
         return 1
     fi
 
     # Get the url list of file to download
-    local list=$(echo "$xml_info" | grep -E -o "href\s*=\s*.*>" | cut -d \' -f2 | awk -v q=$OFFICIAL_REPO '{ print q$0 }' | xargs)
+    local list=$(echo "$xml_info" | $GREP -E -o "href\s*=\s*.*>" | cut -d \' -f2 | $AWK -v q=$OFFICIAL_REPO '{ print q$0 }' | xargs)
 
     for w in $list; do
         # Get the filename from the url
-        local name=$(echo "$w" | awk -F ? '{print $1}' | awk -v q="$OFFICIAL_REPO/svntogit/${repo}.git/plain/trunk/" '{gsub(q, "") ; print $0}' | awk -v q="$OFFICIAL_REPO/svntogit/${repo}.git/plain/" '{gsub(q, "") ; print $0}')
+        local name=$(echo "$w" | $AWK -F ? '{print $1}' | $AWK -v q="$OFFICIAL_REPO/svntogit/${repo}.git/plain/trunk/" '{gsub(q, "") ; print $0}' | $AWK -v q="$OFFICIAL_REPO/svntogit/${repo}.git/plain/" '{gsub(q, "") ; print $0}')
         if [ "$name" != "" ]; then
             builtin cd $maindir
-            wget --no-check-certificate -P "$maindir" -O $name $w
+            $WGET --no-check-certificate -P "$maindir" -O $name $w
             builtin cd -
         fi
     done
@@ -240,7 +235,7 @@ function download_precompiled_package(){
     local ret="1"
     for (( i=0; i<${#repos[@]}; i++ ))
     do
-        wget --no-check-certificate -P "$maindir" -O ${pkgname}-${pkgver}-${arch}.pkg.tar.xz https://www.archlinux.org/packages/${repos[i]}/${arch}/${pkgname}/download/
+        $WGET --no-check-certificate -P "$maindir" -O ${pkgname}-${pkgver}-${arch}.pkg.tar.xz https://www.archlinux.org/packages/${repos[i]}/${arch}/${pkgname}/download/
         ret=$?
         [ "$ret" == "0" ] && break
     done
@@ -260,10 +255,10 @@ function compile_package(){
         # Handle the :: delimiter
         local sourcename=""
         local urlname=""
-        if echo "$source_string" | grep ::
+        if echo "$source_string" | $GREP ::
         then
-            sourcename=$(echo "$source_string" | awk -F:: '{print $1}')
-            urlname=$(echo "$source_string" | awk -F:: '{print $2}')
+            sourcename=$(echo "$source_string" | $AWK -F:: '{print $1}')
+            urlname=$(echo "$source_string" | $AWK -F:: '{print $2}')
         else
             sourcename=$(basename $source_string)
             urlname=$source_string
@@ -273,7 +268,7 @@ function compile_package(){
             mv -f $sourcename $srcdir/ || return 1
         else
             echo -e "\033[1;37mDownloading $sourcename ...\033[0m"
-            wget --no-check-certificate -O $srcdir/$sourcename "$urlname" || return 1
+            $WGET --no-check-certificate -O $srcdir/$sourcename "$urlname" || return 1
         fi
 
         # Check sum for each file downloaded
@@ -374,8 +369,10 @@ function read_pkgbuild() {
         grep_patterns="$grep_patterns --regexp=${var}="
     done
     local lines=""
-    type -t package_$pkgid &> /dev/null && lines=$(type package_$pkgid | grep -E $grep_patterns)
+    type -t package_$pkgid &> /dev/null && lines=$(type package_$pkgid | $GREP -E $grep_patterns)
     eval "$lines"
+
+    # TODO define a unique value array for depends
 }
 
 function check_version_condition(){
@@ -387,8 +384,8 @@ function check_version_condition(){
 # Return 0 if the pkgver assert the condition, 1 otherwise
 
     local ver=$1
-    local cond=$(echo "$2" | grep -o -e ">=" -e "<=" -e ">" -e "<" -e "=")
-    local vercond="$(echo "$2" | awk -F "$cond" '{print $2}')"
+    local cond=$(echo "$2" | $GREP -o -e ">=" -e "<=" -e ">" -e "<" -e "=")
+    local vercond="$(echo "$2" | $AWK -F "$cond" '{print $2}')"
     if [[ "$cond"  == ">" ]]; then
         [[ "$ver" > "$vercond" ]]
     elif [[ "$cond"  == "<" ]]; then
@@ -419,6 +416,8 @@ function install_package(){
 
     # TODO add a verbose option
     # TODO add required by field
+
+    # TODO check if filesystem is installed and install it first!
 
     #acquire $JUJU_PACKAGE_HOME/metadata/locks/main.lck
 
@@ -540,16 +539,16 @@ function install_package(){
     for dep in "${depends[@]}" "${makedepends[@]}"
     do
         # Handle the version condition such as 'linux-header>=3.7'
-        local condition=$(echo "$dep" | grep -o -e ">=" -e "<=" -e ">" -e "<" -e "=")
+        local condition=$(echo "$dep" | $GREP -o -e ">=" -e "<=" -e ">" -e "<" -e "=")
         if [ -n "$condition" ]; then
-            local depvercondition="${condition}$(echo "$dep" | awk -F "$condition" '{print $2}')"
-            dep=$(echo "$dep" | awk -F "$condition" '{print $1}')
+            local depvercondition="${condition}$(echo "$dep" | $AWK -F "$condition" '{print $2}')"
+            dep=$(echo "$dep" | $AWK -F "$condition" '{print $1}')
         fi
 
         local res=$(confirm_question "Do you want to install $dep package? (Y/n)> ")
         if [ "$res" == "Y" ] || [ "$res" == "y" ] || [ "$res" == "" ]; then
             installed_deps+=("'"$dep"'")
-            /bin/bash -c "export JUJU_PACKAGE_HOME=$JUJU_PACKAGE_HOME; source $FILE; install_package \"$dep\" $from_source \"$depvercondition\"" || \
+            $BASHH -c "export JUJU_PACKAGE_HOME=$JUJU_PACKAGE_HOME; source $FILE; install_package \"$dep\" $from_source \"$depvercondition\"" || \
                 die "Error: dependency package $dep not installed."
         fi
 
@@ -566,9 +565,9 @@ function install_package(){
         then
             builtin cd $pkgdir
             # to extract we can use tar Jxvf but probably using xz command is more portable
-            if xz -d ${maindir}/${pkgid}-${pkgver}-${myarch}.pkg.tar.xz
+            if $XZ -d ${maindir}/${pkgid}-${pkgver}-${myarch}.pkg.tar.xz
             then
-                tar xvf ${maindir}/${pkgid}-${pkgver}-${myarch}.pkg.tar
+                $TAR xvf ${maindir}/${pkgid}-${pkgver}-${myarch}.pkg.tar
             else
                 echoerr -e "\033[1;31mError: xz command doesn't exist (Try to install it first)\033[0m"
                 echo -e "\033[1;37mCompiling from source files...\033[0m"
@@ -605,7 +604,7 @@ function install_package(){
     local updated=false
     [ -d "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}" ] && updated=true
     if $updated; then
-        local old_pkgver=$(/bin/bash -c "source $JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGBUILD; echo \$pkgver")
+        local old_pkgver=$($BASHH -c "source $JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGBUILD; echo \$pkgver")
         type -t pre_upgrade &> /dev/null && pre_upgrade "$pkgver" "$old_pkgver"
         remove_package "${pkgid}" false &> /dev/null || \
             echoerr -e "\033[1;33mWarning: Got an error when removing ${pkgid} old version. Continuing updating ${pkgid} anyway ...\033[0m"
@@ -622,20 +621,20 @@ function install_package(){
 
     builtin cd $pkgdir
     if [ -f .PKGINFO ]; then
-        grep -e builddate -e packager .PKGINFO | awk -F " = " '{print $1"=\""$2"\""}' >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
+        $GREP -e builddate -e packager .PKGINFO | $AWK -F " = " '{print $1"=\""$2"\""}' >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
         rm -f .PKGINFO
     fi
     [ -f .MTREE ] && rm -f .MTREE
     local packpaths="$(du -ab)"
-    local size=$(echo "$packpaths" | tail -n 1 | awk '{print $1}')
-    local packpaths=$(echo "$packpaths" | cut -f2- | awk -v q="$JUJU_PACKAGE_HOME/root" '{sub("^.",q);print}')
+    local size=$(echo "$packpaths" | tail -n 1 | $AWK '{print $1}')
+    local packpaths=$(echo "$packpaths" | cut -f2- | $AWK -v q="$JUJU_PACKAGE_HOME/root" '{sub("^.",q);print}')
     echo "instsize=\"$size\"" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
     echo "instdate=\"$(date +%s)\"" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
     echo "instdeps=(${installed_deps[@]})" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
     echo "$packpaths" > "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/FILES"
 
     # TODO Check conflicts between the package and the root directory
-    #du -ab "$JUJU_PACKAGE_HOME/root/" "$packpaths" | grep -x -F -f $JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/${pkgid}.paths
+    #du -ab "$JUJU_PACKAGE_HOME/root/" "$packpaths" | $GREP -x -F -f $JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/${pkgid}.paths
 
     # The following cmds are dangerous! Could dirty the installation directory
     cp -f -v -a --target-directory $JUJU_PACKAGE_HOME/root *
@@ -720,7 +719,7 @@ function remove_package(){
             local res="y"
             $norollback && res=$(confirm_question "Do you want remove $dep package? (y/N)> ")
             if [ "$res" == "y" ] || [ "$res" == "Y" ]; then
-                /bin/bash -c "source $FILE; remove_package $dep $JUJU_PACKAGE_HOME $norollback"
+                $BASHH -c "source $FILE; remove_package $dep $JUJU_PACKAGE_HOME $norollback"
             fi
         done
     fi
@@ -738,7 +737,7 @@ function remove_package(){
         builtin cd $JUJU_PACKAGE_HOME/root
     fi
 
-    local old_pkgver=$(/bin/bash -c "source $JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/PKGBUILD; echo \$pkgver")
+    local old_pkgver=$($BASHH -c "source $JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/PKGBUILD; echo \$pkgver")
     type -t pre_remove &> /dev/null && pre_remove "$old_pkgver"
 
     # Delete all files first

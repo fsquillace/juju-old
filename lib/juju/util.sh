@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This file is part of JuJu: The universal GNU/Linux package manager
 #
@@ -17,6 +17,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
+
+
+# This module requires the variables:
+# FILEE for file command
+# TAR for tar command
+# XZ for xz command
+# AWK for awk command
 
 function confirm_question(){
     # $1: prompt;
@@ -76,7 +83,7 @@ function findformat() {
 
     if [ "$format" == "" ]
     then
-        local file_info=$(file $filename | tr '[:upper:]' '[:lower:]')
+        local file_info=$($FILEE $filename | tr '[:upper:]' '[:lower:]')
         case $file_info in
 	    *\ gzip\ *)       format='n.gz' ;;
 	    *\ xz\ *)         format='n.xz' ;;
@@ -131,16 +138,16 @@ function extract(){
     fi
 
     case $ext in
-        '.tar.bz2')     tar xvjf $filename ;;
-        '.tar.gz')      tar xvzf $filename ;;
-        '.tar.xz')      tar Jxvf $filename ;;
-        '.xz')          xz -d $filename ;; #&& new_file=$(basename "$filename" .xz) ;;
+        '.tar.bz2')     $TAR xvjf $filename ;;
+        '.tar.gz')      $TAR xvzf $filename ;;
+        '.tar.xz')      $TAR Jxvf $filename ;;
+        '.xz')          $XZ -d $filename ;; #&& new_file=$(basename "$filename" .xz) ;;
         '.bz2')         bunzip2 $filename ;;
         '.rar')         unrar x $filename ;;
         '.gz')          gunzip $filename ;;
-        '.tar')         tar xvf $filename ;;
-        '.tbz2')        tar xvjf $filename ;;
-        '.tgz')         tar xvzf $filename ;;
+        '.tar')         $TAR xvf $filename ;;
+        '.tbz2')        $TAR xvjf $filename ;;
+        '.tgz')         $TAR xvzf $filename ;;
         '.zip')         unzip $filename ;;
         '.Z')           uncompress $filename ;;
         '.7z')          7z x $filename ;;
@@ -177,7 +184,7 @@ function check_sum(){
     local sum_command="md5sum"
     [ ! -z $3 ] && sum_command="$3"
     [ "$checksum" == "SKIP" ] && return 0
-    local sum=$($sum_command $filename | awk '{print $1}')
+    local sum=$($sum_command $filename | $AWK '{print $1}')
     if [ "$sum" != "$checksum" ]; then
         echo -e "\033[1;31mError: Not a correct checksum for $(basename $filename)\033[0m"
         return 1

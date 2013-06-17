@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This file is part of JuJu: The universal GNU/Linux package manager
 #
@@ -18,50 +18,88 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+########################### MAIN VARIABLES ENVIRONMENT #################################
 
 [ -z "$JUJU_PACKAGE_HOME" ] && JUJU_PACKAGE_HOME="$HOME/.juju"
 JUJU_PACKAGE_HOME=$(readlink -f $JUJU_PACKAGE_HOME)
 mkdir -p $JUJU_PACKAGE_HOME
-if [ ! -d "$JUJU_PACKAGE_HOME" ]
+
+export PATH=${HOME}/.jujup/bin:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin:$PATH
+
+export LD_LIBRARY_PATH=$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib:$LD_LIBRARY_PATH
+
+########################### IMPORTS ####################################################
+
+# Define the variables for the dependency commands which, awk
+if [ "$0" == "-bash" ]
 then
-    echo -e "\033[1;31mError: The path '$JUJU_PACKAGE_HOME' doesn't exist\033[0m"
-    return 128
+    # it is called by using source ...
+    source "$(dirname ${BASH_ARGV[0]})/../lib/juju/essentials.sh"
+else
+    set -e
+    source "$(dirname $0)/../lib/juju/essentials.sh"
 fi
 
-
-export PATH=$PATH:${HOME}/.jujup/bin:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin
-
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib
+########################## OTHER VARIABLES ENVIRONMENT #########################
 
 export MANPATH=$MANPATH:$JUJU_PACKAGE_HOME/root/usr/share/man
 
 # Update runtimepath variable
 function vim(){
     if ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/* &> /dev/null; then
-        local vimpaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/* | awk 'BEGIN{ORS=","}{print $0}')
+        local vimpaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/* | $AWK 'BEGIN{ORS=","}{print $0}')
         local vimafterpaths=""
         if ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/*/after &> /dev/null; then
-            vimafterpaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/*/after | awk 'BEGIN{ORS=","}{print $0}')
+            vimafterpaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/share/vim/*/after | $AWK 'BEGIN{ORS=","}{print $0}')
         fi
-        /usr/bin/vim -c "set runtimepath+=$vimpaths" -c "set runtimepath+=$vimafterpaths" $@
+        $($WHICH vim) -c "set runtimepath+=$vimpaths" -c "set runtimepath+=$vimafterpaths" $@
     else
-        vim $@
+        $($WHICH vim) $@
     fi
 }
 
 
 # Update PYTHONPATH variable
 if ls -d $JUJU_PACKAGE_HOME/root/usr/lib/python* &> /dev/null; then
-    pypaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/lib/python*/site-packages | awk 'BEGIN{ORS=":"}{print $0}')
+    pypaths=$(ls -d $JUJU_PACKAGE_HOME/root/usr/lib/python*/site-packages | $AWK 'BEGIN{ORS=":"}{print $0}')
     export PYTHONPATH=$PYTHONPATH:$pypaths
     unset pypaths
 fi
 
-if [ "$1" == "sudo" ]; then
+
+function preexec(){
+# Prepare the given command and execute it
+#
+# $@: command
+#
+    sudo_cmd=false
+    if [ "$1" == "sudo" ]; then
+        shift
+        sudo_cmd=true
+    fi
+
+    if [ "$(type -t $1)" != "file" ]; then
+        $@
+        return
+    fi
+
+    # Get the command and check where it is located
+    cmd=$($WHICH $1 2> /dev/null )
+
     shift
-    vars="$@"
-    su -p -c "$vars"
-    unset vars
-else
-    $@
-fi
+    if [[ $cmd =~ $JUJU_PACKAGE_HOME   ]]; then
+        cmd="$(get_loader) $cmd"
+    fi
+
+    if $sudo_cmd
+    then
+        su -p -c "$cmd $@"
+    else
+        $cmd $@
+    fi
+}
+
+preexec $@
+
+trap 'preexec $BASH_COMMAND' DEBUG
+

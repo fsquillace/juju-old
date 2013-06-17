@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This file is part of JuJu: The universal GNU/Linux package manager
 #
