@@ -33,11 +33,9 @@ mkdir -p "$JUJU_PACKAGE_HOME"
 
 [ -z $JUJU_DEBUG ] && JUJU_DEBUG=0
 
-# Update PATH and LD_LIBRARY_PATH with the juju local repo
+# Update PATH with the juju local repo
 # Search for the commands juju dependencies in this order: juju local repo, root system
 PATH=$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin:$PATH
-
-LD_LIBRARY_PATH=$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib:$LD_LIBRARY_PATH
 
 ################################ IMPORTS #################################
 # Define the variables for the dependency commands bash, wget, tar, which, awk, grep, xz, file

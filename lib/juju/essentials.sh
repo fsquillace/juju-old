@@ -34,7 +34,7 @@ function get_loader(){
         echo -e "\033[1;31mError: The executable in JuJu repo cannot be executed without glibc. Install it first: juju -i glibc\033[0m" 1>&2;
         exit 128
     fi
-    echo $JUJU_PACKAGE_HOME/root/usr/lib/ld-*.so
+    echo $JUJU_PACKAGE_HOME/root/usr/lib/ld-*.so --library-path "$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib"
 }
 
 WHICH=which

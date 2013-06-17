@@ -26,8 +26,6 @@ mkdir -p $JUJU_PACKAGE_HOME
 
 export PATH=${HOME}/.jujup/bin:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin:$PATH
 
-export LD_LIBRARY_PATH=$JUJU_PACKAGE_HOME/root/lib:$JUJU_PACKAGE_HOME/root/usr/lib:$LD_LIBRARY_PATH
-
 ########################### IMPORTS ####################################################
 
 # Define the variables for the dependency commands which, awk
