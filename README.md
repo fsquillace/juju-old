@@ -134,21 +134,31 @@ your system does not have one of these dependencies you can get it by typing:
 
 ## Troubleshooting
 
-1. Why don't I see the command if I use sudo?
+Q: Why don't I see the command if I use sudo?
 
-TODO ANSWER
+A: TODO ANSWER
 
-2. I have installed a python library (or vim plugin) but the system doesn't see it. It says "no module named 'modulename'".
+Q: Why do I get the error: "FATAL: kernel too old"?
 
-This is because JuJu need to update the 'PYTHONPATH' or the vim runtimepath with the new directories created after the
-installation of the package.
-To get it updated just re-source jujuenv:
+A: This is because the executable from the precompiled package cannot always run in particular if the kernel is old.
+If the package is one the main of jujubox (such as bash, tar, wget, ...) you might need to compile the package it self
+and update the PATH variable accordingly.
+
+Q: I have installed a python library (or vim plugin) but the system doesn't see it.
+It says "no module named 'modulename'".
+
+A: This is because JuJu need to update the 'PYTHONPATH' or the vim runtimepath with the new
+directories created after the installation of the package. To get it updated just re-source jujuenv:
 
     $> source ~/.jujup/lib/juju/jujuenv
 
-3. Why do I get an error "cp: cannot overwrite directory ${HOME}/.juju/root/usr/sbin with non-directory" when I am installing 'filesystem' package?
 
-The 'filesystem' is a package that define the main directories of the Linux system. It is always useful to install 'filesystem' before any other packages that place files in the directories /lib, /lib64, /sbin, /bin.
+Q: Why do I get an error "cp: cannot overwrite directory ${HOME}/.juju/root/usr/sbin
+with non-directory" when I am installing 'filesystem' package?
+
+A: The 'filesystem' is a package that define the main directories of the Linux system.
+It is always useful to install 'filesystem' before any other packages that place files
+in the directories /lib, /lib64, /sbin, /bin.
 
 ## License
 Copyright (c) 2012-2013

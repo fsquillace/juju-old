@@ -22,6 +22,16 @@
 # JUJU_PACKAGE_HOME (mandatory) to check if the executable are available
 # PATH (optional) in order to set new paths of executables
 
+# List of Unix commands provided:
+# AWK (mandatory)
+# BASH (mandatory)
+# WGET (mandatory)
+# GREP (mandatory)
+# TAR (mandatory)
+# FILEE (mandatory)
+# XZ (optional): it is useful for getting the precompiled.
+#                A warn will be print if xz doesn't work.
+
 function get_loader(){
     # Get the glibc version installed
     if [ ! -f "$JUJU_PACKAGE_HOME/metadata/packages/glibc/PKGBUILD" ]
@@ -51,10 +61,10 @@ fi
 function _find_command(){
 # $1: initial command
 
-    local comm=$($WHICH $1 2> /dev/null )
+    local comm=$($WHICH $1)
     if [ "$comm" == "" ]
     then
-        echo -e "\033[1;31mError: '$comm' command not found. Try execute: jujubox\033[0m" 1>&2;
+        echo -e "\033[1;31mError: '$1' command not found. Try execute jujubox or compile package\033[0m" 1>&2;
         exit 128
     fi
     if [[ $comm =~ $JUJU_PACKAGE_HOME ]]; then
@@ -77,3 +87,32 @@ XZ=$(_find_command "xz")
 WGET=$(_find_command "wget")
 
 FILEE=$(_find_command "file")
+
+
+# Tests of all commands
+function test_command(){
+if ! $1 --help 1> /dev/null
+then
+    echo -e "\033[1;31mError: '$1' not working. Try execute jujubox or compile package.\033[0m" 1>&2;
+    exit 1
+fi
+}
+
+test_command "$GREP"
+test_command "$BASHH"
+test_command "$TAR"
+test_command "$AWK"
+test_command "$FILEE"
+test_command "$WGET"
+
+if ! $XZ --help 1> /dev/null
+then
+    echo -e "\033[1;33mWarning: 'xz' not working. It will not be possible to get pre-compiled packages. Try execute jujubox or compile package. Continuing anyway...\033[0m" 1>&2;
+    exit 1
+fi
+
+if ! $WGET --help | $GREP "no-check-certificate" 1> /dev/null
+then
+    echo -e "\033[1;31mError: 'wget' not working properly. Try execute jujubox or compile package.\033[0m" 1>&2;
+    exit 1
+fi

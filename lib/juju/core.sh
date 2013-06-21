@@ -35,7 +35,7 @@ mkdir -p "$JUJU_PACKAGE_HOME"
 
 # Update PATH with the juju local repo
 # Search for the commands juju dependencies in this order: juju local repo, root system
-PATH=$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin:$PATH
+PATH=$PATH:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin
 
 ################################ IMPORTS #################################
 # Define the variables for the dependency commands bash, wget, tar, which, awk, grep, xz, file
@@ -246,6 +246,7 @@ function compile_package(){
     # Usage: compile_package <> <>
     # return 0 if package successfully compiled, 1 otherwise
 
+    # TODO use trap for catching the commands that belong to the juju repo and add the linker
     for (( i=0; i<${#source[@]}; i++ ))
     do
         local source_string=${source[i]}
