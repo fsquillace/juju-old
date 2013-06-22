@@ -24,18 +24,7 @@
 
 set -e
 
-################################ MAIN VARIABLES ##########################
 FILE="$(readlink -f ${BASH_ARGV[0]})"
-
-[ -z "$JUJU_PACKAGE_HOME" ]  && JUJU_PACKAGE_HOME="$HOME/.juju"
-JUJU_PACKAGE_HOME=$(readlink -f $JUJU_PACKAGE_HOME)
-mkdir -p "$JUJU_PACKAGE_HOME"
-
-[ -z $JUJU_DEBUG ] && JUJU_DEBUG=0
-
-# Update PATH with the juju local repo
-# Search for the commands juju dependencies in this order: juju local repo, root system
-PATH=$PATH:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin
 
 ################################ IMPORTS #################################
 # Define the variables for the dependency commands bash, wget, tar, which, awk, grep, xz, file
@@ -112,7 +101,7 @@ function list_package(){
             echoerr -e "\033[1;31mError: $pkgname is not installed\033[0m"
             return 128
         fi
-        cat $JUJU_PACKAGE_HOME/metadata/packages/$pkgname/FILES
+        cat $JUJU_PACKAGE_HOME/metadata/packages/$pkgname/FILES | $AWK -v q="$JUJU_PACKAGE_HOME/root" '{print q$0}'
     else
         ls $JUJU_PACKAGE_HOME/metadata/packages/ | \
             while read pack; do
@@ -562,17 +551,17 @@ function install_package(){
         echo -e "\033[1;37mGetting pre-compiled package...\033[0m"
         if download_precompiled_package $pkgid $pkgver $myarch $maindir
         then
-            builtin cd $pkgdir
             # to extract we can use tar Jxvf but probably using xz command is more portable
             if $XZ -d ${maindir}/${pkgid}-${pkgver}-${myarch}.pkg.tar.xz
             then
+                builtin cd $pkgdir
                 $TAR xvf ${maindir}/${pkgid}-${pkgver}-${myarch}.pkg.tar
+                builtin cd $OLDPWD
             else
                 echoerr -e "\033[1;31mError: xz command doesn't exist (Try to install it first)\033[0m"
                 echo -e "\033[1;37mCompiling from source files...\033[0m"
                 compile_package || die "Error when compiling the package $pkgid"
             fi
-            builtin cd $OLDPWD
         else
             echoerr -e "\033[1;33mWarning: pre-compiled package not available, compiling it...\033[0m"
             compile_package || die "Error when compiling the package $pkgid"
@@ -626,7 +615,7 @@ function install_package(){
     [ -f .MTREE ] && rm -f .MTREE
     local packpaths="$(du -ab)"
     local size=$(echo "$packpaths" | tail -n 1 | $AWK '{print $1}')
-    local packpaths=$(echo "$packpaths" | cut -f2- | $AWK -v q="$JUJU_PACKAGE_HOME/root" '{sub("^.",q);print}')
+    local packpaths=$(echo "$packpaths" | cut -f2- | $AWK '{sub("^.","");print}')
     echo "instsize=\"$size\"" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
     echo "instdate=\"$(date +%s)\"" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
     echo "instdeps=(${installed_deps[@]})" >> "$JUJU_PACKAGE_HOME/metadata/packages/${pkgid}/PKGINFO"
@@ -723,7 +712,7 @@ function remove_package(){
         done
     fi
 
-    cat "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/FILES"
+    cat "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/FILES" | $AWK -v q="$JUJU_PACKAGE_HOME/root" '{print q$0}'
     local res="y"
     $norollback && res=$(confirm_question "Do you want remove $pkgname package? (y/N)> ")
     if [ "$res" == "n" ] || [ "$res" == "N" ] || [ "$res" == "" ]; then
@@ -740,7 +729,7 @@ function remove_package(){
     type -t pre_remove &> /dev/null && pre_remove "$old_pkgver"
 
     # Delete all files first
-    for element in  $(cat "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/FILES" | xargs)
+    for element in  $(cat "$JUJU_PACKAGE_HOME/metadata/packages/${pkgname}/FILES" | $AWK -v q="$JUJU_PACKAGE_HOME/root" '{print q$0}' | xargs)
     do
         if [ -f $element ] || [ -L $element ]
         then

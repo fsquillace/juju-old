@@ -32,6 +32,26 @@
 # XZ (optional): it is useful for getting the precompiled.
 #                A warn will be print if xz doesn't work.
 
+########################### MAIN VARIABLES ENVIRONMENT #################################
+
+[ -z "$JUJU_PACKAGE_HOME" ] && JUJU_PACKAGE_HOME="$HOME/.juju"
+JUJU_PACKAGE_HOME=$(readlink -f $JUJU_PACKAGE_HOME)
+mkdir -p $JUJU_PACKAGE_HOME
+
+[ -z $JUJU_DEBUG ] && JUJU_DEBUG=0
+
+# Update PATH with the juju local repo
+# Search for the commands juju dependencies in this order: root system, juju local repo
+export PATH=$PATH:${HOME}/.jujup/bin:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin
+
+######################## VARIABLES ENVIRONMENT FOR COMPILING #########################
+export CPATH=$JUJU_PACKAGE_HOME/root/usr/include
+export C_INCLUDE_PATH=$JUJU_PACKAGE_HOME/root/usr/include
+export CPLUS_INCLUDE_PATH=$JUJU_PACKAGE_HOME/root/usr/include
+
+
+######################## MAIN COMMANDS #################################
+
 function get_loader(){
     # Get the glibc version installed
     if [ ! -f "$JUJU_PACKAGE_HOME/metadata/packages/glibc/PKGBUILD" ]
@@ -67,6 +87,7 @@ function _find_command(){
         echo -e "\033[1;31mError: '$1' command not found. Try execute jujubox or compile package\033[0m" 1>&2;
         exit 128
     fi
+    # TODO not necessarily true that the executable inside juju has to have a customize loader
     if [[ $comm =~ $JUJU_PACKAGE_HOME ]]; then
         echo "$(get_loader) $comm"
     else
@@ -107,12 +128,11 @@ test_command "$WGET"
 
 if ! $XZ --help 1> /dev/null
 then
-    echo -e "\033[1;33mWarning: 'xz' not working. It will not be possible to get pre-compiled packages. Try execute jujubox or compile package. Continuing anyway...\033[0m" 1>&2;
-    exit 1
+    echo -e "\033[1;33mWarning: '$XZ' not working. It will not be possible to get pre-compiled packages. Try execute jujubox or compile package. Continuing anyway...\033[0m" 1>&2;
 fi
 
 if ! $WGET --help | $GREP "no-check-certificate" 1> /dev/null
 then
-    echo -e "\033[1;31mError: 'wget' not working properly. Try execute jujubox or compile package.\033[0m" 1>&2;
+    echo -e "\033[1;31mError: '$WGET' not working properly. Try execute jujubox or compile package.\033[0m" 1>&2;
     exit 1
 fi

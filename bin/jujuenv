@@ -18,14 +18,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-########################### MAIN VARIABLES ENVIRONMENT #################################
-
-[ -z "$JUJU_PACKAGE_HOME" ] && JUJU_PACKAGE_HOME="$HOME/.juju"
-JUJU_PACKAGE_HOME=$(readlink -f $JUJU_PACKAGE_HOME)
-mkdir -p $JUJU_PACKAGE_HOME
-
-export PATH=${HOME}/.jujup/bin:$JUJU_PACKAGE_HOME/root/usr/local/bin:$JUJU_PACKAGE_HOME/root/usr/bin:$JUJU_PACKAGE_HOME/root/bin:$JUJU_PACKAGE_HOME/root/usr/local/sbin:$JUJU_PACKAGE_HOME/root/usr/sbin:$JUJU_PACKAGE_HOME/root/sbin:$PATH
-
 ########################### IMPORTS ####################################################
 
 # Define the variables for the dependency commands which, awk
