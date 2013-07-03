@@ -21,7 +21,8 @@
 NAME='juju'
 VERSION='0.5.8'
 
-source "$(dirname $0)/../lib/juju/core.sh"
+HOME_DIR="$( cd ../"$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$(HOME_DIR)/lib/juju/core.sh"
 
 ###################################
 ### General functions           ###
