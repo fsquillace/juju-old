@@ -19,7 +19,6 @@
 #
 
 NAME='juju'
-VERSION='0.5.8'
 
 source "$(dirname $0)/../lib/juju/core.sh"
 
@@ -32,14 +31,10 @@ usage() {
         echo -e "Usage: $NAME <operation> [options]"
 		echo -e "The universal package manager"
         echo -e "Operations:"
-		echo -e "-i, --install <package(s)>    Install the package(s) in ${JUJU_PACKAGE_HOME}"
-		echo -e "\tOptions:"
-        echo -e "\t-s, --source                Take the source code and compile it"
-		echo -e "-r, --remove <package(s)>     Remove the package(s) in ${JUJU_PACKAGE_HOME}"
-		echo -e "-l, --list [<package(s)>]     List the packages installed in ${JUJU_PACKAGE_HOME}"
-		echo -e "                              or the files if the package(s) are specified"
-        echo -e "-h, --help                    Show this help message"
-        echo -e "-v, --version                 Show the $NAME version"
+		echo -e "-i, --install <package(s)>               Install the package(s) in ${JUJU_PACKAGE_HOME}"
+		echo -e "-I, --install-from-file <filename(s)>    Install the package(s) from file in ${JUJU_PACKAGE_HOME}"
+        echo -e "-h, --help                               Show this help message"
+        echo -e "-v, --version                            Show the $NAME version"
 }
 
 version() {
@@ -53,25 +48,21 @@ version() {
 ### MAIN PROGRAM                ###
 ###################################
 
-TEMP=`getopt -o isrlhv --long install,source,remove,list,help,version -n 'juju' -- "$@"`
+TEMP=`getopt -o iIhv --long install,install-from-file,help,version -n 'juju' -- "$@"`
 
 if [ $? != 0 ] ; then echo -e "\033[1;31mError on parsing the command line. Try juju -h\033[0m" >&2 ; exit ; fi
 
 # Note the quotes around `$TEMP': they are essential!
 eval set -- "$TEMP"
 
-OPT_SOURCE=false
-OPT_INSTALL=false
-OPT_REMOVE=false
-OPT_LIST=false
+OPT_INSTALL_FROM_REPO=false
+OPT_INSTALL_FROM_FILE=false
 OPT_HELP=false
 OPT_VERSION=false
 while true ; do
     case "$1" in
-        -i|--install) OPT_INSTALL=true ; shift ;;
-        -s|--source) OPT_SOURCE=true ; shift ;;
-        -r|--remove) OPT_REMOVE=true ; shift ;;
-        -l|--list) OPT_LIST=true ; shift ;;
+        -i|--install) OPT_INSTALL_FROM_REPO=true ; shift ;;
+        -I|--install-from-file) OPT_INSTALL_FROM_FILE=true ; shift ;;
         -h|--help) OPT_HELP=true ; shift ;;
         -v|--version) OPT_VERSION=true ; shift ;;
         --) shift ; break ;;
@@ -95,40 +86,18 @@ then
 	exit 1
 fi
 
-################## CHECKING ERROR OPTIONS ###########
-if $OPT_SOURCE && ! $OPT_INSTALL
-then
-    echo -e "\033[1;31mPlease specify the --install option.\033[0m"
-	exit 127
-fi
-
-if ! $OPT_INSTALL && ! $OPT_REMOVE && ! $OPT_LIST; then
-    echo -e "\033[1;31mPlease specify an action.\033[0m"
-	usage
-	exit 127
-fi
-
 ################ DEFINE ACTION ########################
-if $OPT_INSTALL; then
+if $OPT_INSTALL_FROM_REPO; then
 	for pack in ${ARGS[@]}
 	do
-		install_package $pack $OPT_SOURCE
+		install_package_group_from_repo $pack
 	done
-elif $OPT_REMOVE; then
-	for pack in ${ARGS[@]}
-	do
-		remove_package $pack
-	done
-elif $OPT_LIST; then
-	if [ "${#ARGS[@]}" != "0" ]
-	then
-		for pack in ${ARGS[@]}
-		do
-			list_package $pack
-		done
-	else
-		list_package
-	fi
 fi
 
+if $OPT_INSTALL_FROM_FILE; then
+	for pack in ${ARGS[@]}
+	do
+		install_package_group_from_file $pack
+	done
+fi
 # vim: set ts=4 sw=4 noet:
