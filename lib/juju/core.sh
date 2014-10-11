@@ -58,16 +58,19 @@ function install_package_group_from_file(){
 
     # use mktemp, a non portable way is: $(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX)
     maindir=$(TMPDIR=/tmp mktemp -d -t juju.XXXXXXXXXX)
+    trap "echoerr \"Error occurred when installing $pkggrpname\"; rm -rf ${maindir}" EXIT QUIT ABRT KILL TERM INT
 
     builtin cd ${maindir}
-    $TAR -zxvpf ${origin_wd}/${pkggrpname}
+    $TAR -zxpf ${origin_wd}/${pkggrpname}
 
     echo -e "\033[1;37mInstalling ${pkggrpname}...\033[0m"
-    ls ${maindir}/packages | xargs -I {} bash -c "cp -f -v -a ${maindir}/packages/{}/* $JUJU_PACKAGE_HOME/root"
+    ls ${maindir}/packages | xargs -I {} bash -c "cp -f -a ${maindir}/packages/{}/* $JUJU_PACKAGE_HOME/root"
     cp -f -a $maindir/metadata/* $JUJU_PACKAGE_HOME/metadata/
     echo -e "\033[1;37m$pkggrpname installed successfully\033[0m"
 
     builtin cd $origin_wd
+    trap - QUIT EXIT ABRT KILL TERM INT
+    rm -rf ${maindir}
 
     return 0
 }
@@ -93,17 +96,20 @@ function install_package_group_from_repo(){
 
     # use mktemp, a non portable way is: $(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX)
     maindir=$(TMPDIR=/tmp mktemp -d -t juju.XXXXXXXXXX)
+    trap "echoerr \"Error occurred when installing $pkggrp\"; rm -rf ${maindir}" EXIT QUIT ABRT KILL TERM INT
 
     builtin cd ${maindir}
     $WGET ${JUJU_REPO}/$(uname -m)/${pkggrp}.tar.gz
     $TAR -zxvf ${pkggrp}.tar.gz
 
     echo -e "\033[1;37mInstalling ${pkggrp}...\033[0m"
-    ls ${maindir}/packages | xargs -I {} bash -c "cp -f -v -a ${maindir}/packages/{}/* $JUJU_PACKAGE_HOME/root"
+    ls ${maindir}/packages | xargs -I {} bash -c "cp -f -a ${maindir}/packages/{}/* $JUJU_PACKAGE_HOME/root"
     cp -f -a $maindir/metadata/* $JUJU_PACKAGE_HOME/metadata/
     echo -e "\033[1;37m$pkggrp installed successfully\033[0m"
 
     builtin cd $origin_wd
+    trap - QUIT EXIT ABRT KILL TERM INT
+    rm -rf ${maindir}
 
     return 0
 }
@@ -167,6 +173,7 @@ function generate_package_group(){
 
     # use mktemp, a non portable way is: $(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX)
     maindir=$(TMPDIR=/tmp mktemp -d -t juju.XXXXXXXXXX)
+    trap "echoerr \"Error occurred when generating $@\"; rm -rf ${maindir}" EXIT QUIT ABRT KILL TERM INT
     mkdir -p ${maindir}/packages
     mkdir -p ${maindir}/metadata
     builtin cd ${maindir}/packages
@@ -223,6 +230,8 @@ function generate_package_group(){
     echo -e "\033[1;37mPackage group generated successfully\033[0m"
 
     builtin cd $origin_wd
+    trap - QUIT EXIT ABRT KILL TERM INT
+    rm -rf ${maindir}
 
     return 0
 }
