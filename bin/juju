@@ -31,10 +31,11 @@ usage() {
         echo -e "Usage: $NAME <operation> [options]"
 		echo -e "The universal package manager"
         echo -e "Operations:"
-		echo -e "-i, --install <package(s)>               Install the package(s) in ${JUJU_PACKAGE_HOME}"
-		echo -e "-I, --install-from-file <filename(s)>    Install the package(s) from file in ${JUJU_PACKAGE_HOME}"
-        echo -e "-h, --help                               Show this help message"
-        echo -e "-v, --version                            Show the $NAME version"
+		echo -e "-I, --install <package(s)>                  Install the package(s) in ${JUJU_PACKAGE_HOME}"
+		echo -e "-U, --install-from-file <filename(s)>       Install the package(s) from file in ${JUJU_PACKAGE_HOME}"
+		echo -e "-g, --generate-package-group <package(s)>      Generate a package group in a compress file (ArchLinux only)"
+        echo -e "-h, --help                                  Show this help message"
+        echo -e "-v, --version                               Show the $NAME version"
 }
 
 version() {
@@ -48,7 +49,7 @@ version() {
 ### MAIN PROGRAM                ###
 ###################################
 
-TEMP=`getopt -o iIhv --long install,install-from-file,help,version -n 'juju' -- "$@"`
+TEMP=`getopt -o IUghv --long install,install-from-file,generate-package-group,help,version -n 'juju' -- "$@"`
 
 if [ $? != 0 ] ; then echo -e "\033[1;31mError on parsing the command line. Try juju -h\033[0m" >&2 ; exit ; fi
 
@@ -57,12 +58,14 @@ eval set -- "$TEMP"
 
 OPT_INSTALL_FROM_REPO=false
 OPT_INSTALL_FROM_FILE=false
+OPT_GENERATE_PACKAGE_GROUP=false
 OPT_HELP=false
 OPT_VERSION=false
 while true ; do
     case "$1" in
-        -i|--install) OPT_INSTALL_FROM_REPO=true ; shift ;;
-        -I|--install-from-file) OPT_INSTALL_FROM_FILE=true ; shift ;;
+        -I|--install) OPT_INSTALL_FROM_REPO=true ; shift ;;
+        -U|--install-from-file) OPT_INSTALL_FROM_FILE=true ; shift ;;
+        -g|--generate-package-group) OPT_GENERATE_PACKAGE_GROUP=true ; shift ;;
         -h|--help) OPT_HELP=true ; shift ;;
         -v|--version) OPT_VERSION=true ; shift ;;
         --) shift ; break ;;
@@ -99,5 +102,9 @@ if $OPT_INSTALL_FROM_FILE; then
 	do
 		install_package_group_from_file $pack
 	done
+fi
+
+if $OPT_GENERATE_PACKAGE_GROUP; then
+	generate_package_group ${ARGS[@]}
 fi
 # vim: set ts=4 sw=4 noet:
