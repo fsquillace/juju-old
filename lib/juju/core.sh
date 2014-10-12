@@ -33,7 +33,7 @@ TAR=tar
 source "$(dirname ${BASH_ARGV[0]})/util.sh"
 
 ################################# VARIABLES ##############################
-JUJU_REPO=https://github.com/fsquillace/filix-repo/raw/master/package-groups
+JUJU_REPO=https://github.com/fsquillace/juju-repo/raw/master/package-groups
 [ -z $JUJU_PACKAGE_HOME ] && JUJU_PACKAGE_HOME=~/.juju
 
 ################################# MAIN FUNCTIONS ##############################
