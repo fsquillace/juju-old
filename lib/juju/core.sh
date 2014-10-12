@@ -64,10 +64,10 @@ function install_package_group_from_file(){
     builtin cd ${maindir}
     $TAR -zxpf ${origin_wd}/${pkggrpname}
 
-    echo -e "\033[1;37mInstalling ${pkggrpname}...\033[0m"
+    info "Installing ${pkggrpname}..."
     ls ${maindir}/packages | xargs -I {} bash -c "cp -f -a ${maindir}/packages/{}/* $JUJU_PACKAGE_HOME/root"
     cp -f -a $maindir/metadata/* $JUJU_PACKAGE_HOME/metadata/
-    echo -e "\033[1;37m$pkggrpname installed successfully\033[0m"
+    info "$pkggrpname installed successfully"
 
     builtin cd $origin_wd
     trap - QUIT EXIT ABRT KILL TERM INT
@@ -104,10 +104,10 @@ function install_package_group_from_repo(){
     $WGET ${JUJU_REPO}/$(uname -m)/${pkggrp}.tar.gz
     $TAR -zxvf ${pkggrp}.tar.gz
 
-    echo -e "\033[1;37mInstalling ${pkggrp}...\033[0m"
+    info "Installing ${pkggrp}..."
     ls ${maindir}/packages | xargs -I {} bash -c "cp -f -a ${maindir}/packages/{}/* $JUJU_PACKAGE_HOME/root"
     cp -f -a $maindir/metadata/* $JUJU_PACKAGE_HOME/metadata/
-    echo -e "\033[1;37m$pkggrp installed successfully\033[0m"
+    info "$pkggrp installed successfully"
 
     builtin cd $origin_wd
     trap - QUIT EXIT ABRT KILL TERM INT
@@ -171,7 +171,6 @@ function generate_package_group(){
     if [ -z "$1" ]
     then
         die "Error: Package name not specified"
-        return 1
     fi
 
     # use mktemp, a non portable way is: $(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX)
@@ -186,15 +185,15 @@ function generate_package_group(){
     do
         if [ -d "$pkgname" ]
         then
-            echo -e "\033[1;37mSkipping ${pkgname} since it was already built from previous dependencies.\033[0m"
+            info "Skipping ${pkgname} since it was already built from previous dependencies."
             continue
         fi
 
-        echo -e "\033[1;37mCalculating the closure dependencies for ${pkgname}...\033[0m"
+        info "Calculating the closure dependencies for ${pkgname}..."
         deps=$(get_closure_dependencies $pkgname)
-        echo -e "\033[1;37mList of closure dependencies:\033[0m"
+        info "List of closure dependencies:"
         echo $deps
-        echo -e "\033[1;37mCopying the dependencies...\033[0m"
+        info "Copying the dependencies..."
         for dep in $deps
         do
             [ -d "$dep" ] && continue
@@ -207,7 +206,7 @@ function generate_package_group(){
             mkdir -p ld
             for executable in $(ls ${pkgname}/usr/bin/*)
             do
-                echo -e "\033[1;37mCopying the dynamic libraries for ${executable}...\033[0m"
+                info "Copying the dynamic libraries for ${executable}..."
                 for lib in $( ldd ${executable} | grep -v dynamic | grep "=>" | awk '{print $3}' )
                 do
                     [ -e $lib ] && cp -f --parents $lib ld
@@ -230,10 +229,10 @@ function generate_package_group(){
         fi
 
     done
-    echo -e "\033[1;37mGenerating the compressed file ${1}.tar.gz...\033[0m"
+    info "Generating the compressed file ${1}.tar.gz..."
     $TAR -zcf ${origin_wd}/${1}.tar.gz -C ${maindir} packages
 
-    echo -e "\033[1;37mPackage group generated successfully\033[0m"
+    info "Package group generated successfully"
 
     builtin cd $origin_wd
     trap - QUIT EXIT ABRT KILL TERM INT
@@ -242,16 +241,6 @@ function generate_package_group(){
     return 0
 }
 
-function die(){
-# $1: msg (optional - str: Message to print
-    local msg=""
-    [ -n "$1" ] && msg=$1
-    if [ "$msg" != "" ]
-    then
-        echoerr -e "\033[1;31m$msg\033[0m"
-    fi
-    exit 1
-}
 
 function cleanup_build_directory(){
 # $1: maindir (optional) - str: build directory to get rid

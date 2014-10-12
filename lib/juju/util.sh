@@ -50,6 +50,20 @@ function contains() {
     return 1
 }
 
+function die(){
+# $@: msg (mandatory) - str: Message to print
+    error $@
+    exit 1
+}
+function error(){
+# $@: msg (mandatory) - str: Message to print
+    echoerr -e "\033[1;31m$@\033[0m"
+}
+function info(){
+# $@: msg (mandatory) - str: Message to print
+    echo -e "\033[1;37m$@\033[0m"
+}
+
 function findformat() {
 # Get the format of the given file
 # Return an empty string if the file is not valid
