@@ -120,6 +120,7 @@ function install_package_group_from_repo(){
 function normalize_package(){
     [ "$1" == "sh" ] && echo "bash" && return
     [ "$1" == "libusbx" ] && echo "libusb" && return
+    [ "$1" == "awk" ] && echo "gawk" && return
     echo $1 | sed -e 's/>=.*//' -e 's/>.*//' \
         -e 's/<=.*//' -e 's/<.*//' \
         -e 's/==.*//'
@@ -183,6 +184,12 @@ function generate_package_group(){
 
     for pkgname in $@
     do
+        if [ -d "$pkgname" ]
+        then
+            echo -e "\033[1;37mSkipping ${pkgname} since it was already built from previous dependencies.\033[0m"
+            continue
+        fi
+
         echo -e "\033[1;37mCalculating the closure dependencies for ${pkgname}...\033[0m"
         deps=$(get_closure_dependencies $pkgname)
         echo -e "\033[1;37mList of closure dependencies:\033[0m"
@@ -190,8 +197,9 @@ function generate_package_group(){
         echo -e "\033[1;37mCopying the dependencies...\033[0m"
         for dep in $deps
         do
+            [ -d "$dep" ] && continue
             mkdir -p $dep
-            pacman -Ql $dep | grep -v "/$" | sed 's/.* //' | xargs -I {} bash -c "[ -f {} ] && cp --parents {} $dep"
+            pacman -Ql $dep | grep -v "/$" | sed 's/.* //' | xargs -I {} bash -c "[ -f {} ] && cp -f --parents {} $dep"
         done
 
         if [ -e "${pkgname}/usr/bin" ]
@@ -202,33 +210,28 @@ function generate_package_group(){
                 echo -e "\033[1;37mCopying the dynamic libraries for ${executable}...\033[0m"
                 for lib in $( ldd ${executable} | grep -v dynamic | grep "=>" | awk '{print $3}' )
                 do
-                    [ -e $lib ] && cp --parents $lib ld
+                    [ -e $lib ] && cp -f --parents $lib ld
                 done
                 for lib in $( ldd ${executable} | grep -v dynamic | grep -v "=>" | awk '{print $1}' )
                 do
-                    [ -e $lib ] && cp --parents $lib ld
+                    [ -e $lib ] && cp -f --parents $lib ld
                 done
 
                 # ARCH amd64
                 if [ -f /lib64/ld-linux-x86-64.so.2 ]; then
-                cp --parents /lib64/ld-linux-x86-64.so.2 ld
+                cp -f --parents /lib64/ld-linux-x86-64.so.2 ld
                 fi
 
                 # ARCH i386
                 if [ -f  /lib/ld-linux.so.2 ]; then
-                cp --parents /lib/ld-linux.so.2 ld
+                cp -f --parents /lib/ld-linux.so.2 ld
                 fi
             done
         fi
 
     done
-    for pkgname in $@
-    do
-        filename="$pkgname-$filename"
-    done
-    filename=$(echo ${filename} | sed 's/-$//')
-    echo -e "\033[1;37mGenerating the compressed file ${filename}.tar.gz...\033[0m"
-    $TAR -zcf ${origin_wd}/${filename}.tar.gz -C ${maindir} packages
+    echo -e "\033[1;37mGenerating the compressed file ${1}.tar.gz...\033[0m"
+    $TAR -zcf ${origin_wd}/${1}.tar.gz -C ${maindir} packages
 
     echo -e "\033[1;37mPackage group generated successfully\033[0m"
 
