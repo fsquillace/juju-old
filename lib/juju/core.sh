@@ -219,12 +219,12 @@ function generate_package_group(){
 
                 # ARCH amd64
                 if [ -f /lib64/ld-linux-x86-64.so.2 ]; then
-                cp -f --parents /lib64/ld-linux-x86-64.so.2 ld
+                    cp -f --parents /lib64/ld-linux-x86-64.so.2 ld
                 fi
 
                 # ARCH i386
                 if [ -f  /lib/ld-linux.so.2 ]; then
-                cp -f --parents /lib/ld-linux.so.2 ld
+                    cp -f --parents /lib/ld-linux.so.2 ld
                 fi
             done
         fi
