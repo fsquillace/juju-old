@@ -33,7 +33,7 @@ usage() {
         echo -e "Operations:"
 		echo -e "-I, --install <package(s)>                  Install the package(s) in ${JUJU_PACKAGE_HOME}"
 		echo -e "-U, --install-from-file <filename(s)>       Install the package(s) from file in ${JUJU_PACKAGE_HOME}"
-		echo -e "-g, --generate-package-group <package(s)>      Generate a package group in a compress file (ArchLinux only)"
+		echo -e "-g, --generate-package-group <package(s)>   Generate a package group in a compress file (ArchLinux only)"
         echo -e "-h, --help                                  Show this help message"
         echo -e "-v, --version                               Show the $NAME version"
 }

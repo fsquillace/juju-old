@@ -51,14 +51,15 @@ function install_package_group_from_file(){
     local origin_wd=$(pwd)
 
     pkggrpname=$1
-    if [ -e "$pkggrpname" ]
+    if [ ! -e $pkggrpname ]
     then
-        echoerr -e "\033[1;31mError: Package group file does not exist\033[0m"
+        die "Error: Package group file ${pkggrpname} does not exist"
     fi
 
     # use mktemp, a non portable way is: $(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX)
     maindir=$(TMPDIR=/tmp mktemp -d -t juju.XXXXXXXXXX)
-    trap "echoerr \"Error occurred when installing $pkggrpname\"; rm -rf ${maindir}" EXIT QUIT ABRT KILL TERM INT
+    trap - QUIT EXIT ABRT KILL TERM INT
+    trap "cleanup_build_directory ${maindir}; die \"Error occurred when installing $pkggrpname\"" EXIT QUIT ABRT KILL TERM INT
 
     builtin cd ${maindir}
     $TAR -zxpf ${origin_wd}/${pkggrpname}
@@ -70,7 +71,7 @@ function install_package_group_from_file(){
 
     builtin cd $origin_wd
     trap - QUIT EXIT ABRT KILL TERM INT
-    rm -rf ${maindir}
+    cleanup_build_directory ${maindir}
 
     return 0
 }
@@ -91,12 +92,13 @@ function install_package_group_from_repo(){
     pkggrp=$1
     if [ -z "$pkggrp" ]
     then
-        echoerr -e "\033[1;31mError: Package group name not specified\033[0m"
+        die "Error: Package group name not specified"
     fi
 
     # use mktemp, a non portable way is: $(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX)
     maindir=$(TMPDIR=/tmp mktemp -d -t juju.XXXXXXXXXX)
-    trap "echoerr \"Error occurred when installing $pkggrp\"; rm -rf ${maindir}" EXIT QUIT ABRT KILL TERM INT
+    trap - QUIT EXIT ABRT KILL TERM INT
+    trap "cleanup_build_directory ${maindir}; die \"Error occurred when installing $pkggrp\"" EXIT QUIT ABRT KILL TERM INT
 
     builtin cd ${maindir}
     $WGET ${JUJU_REPO}/$(uname -m)/${pkggrp}.tar.gz
@@ -109,7 +111,7 @@ function install_package_group_from_repo(){
 
     builtin cd $origin_wd
     trap - QUIT EXIT ABRT KILL TERM INT
-    rm -rf ${maindir}
+    cleanup_build_directory ${maindir}
 
     return 0
 }
@@ -135,7 +137,7 @@ function get_closure_dependencies(){
     pkgname=$1
     if [ -z "$pkgname" ]
     then
-        echoerr -e "\033[1;31mError: Package name not specified\033[0m"
+        die "Error: Package name not specified"
     fi
     normalized_pkgname=$(normalize_package $pkgname)
 
@@ -167,13 +169,14 @@ function generate_package_group(){
 
     if [ -z "$1" ]
     then
-        echoerr -e "\033[1;31mError: Package name not specified\033[0m"
+        die "Error: Package name not specified"
         return 1
     fi
 
     # use mktemp, a non portable way is: $(mktemp --tmpdir=/tmp -d juju.XXXXXXXXXX)
     maindir=$(TMPDIR=/tmp mktemp -d -t juju.XXXXXXXXXX)
-    trap "echoerr \"Error occurred when generating $@\"; rm -rf ${maindir}" EXIT QUIT ABRT KILL TERM INT
+    trap - QUIT EXIT ABRT KILL TERM INT
+    trap "cleanup_build_directory ${maindir}; die \"Error occurred during generation of package group\"" EXIT QUIT ABRT KILL TERM INT
     mkdir -p ${maindir}/packages
     mkdir -p ${maindir}/metadata
     builtin cd ${maindir}/packages
@@ -231,7 +234,29 @@ function generate_package_group(){
 
     builtin cd $origin_wd
     trap - QUIT EXIT ABRT KILL TERM INT
-    rm -rf ${maindir}
+    cleanup_build_directory ${maindir}
 
     return 0
+}
+
+function die(){
+# $1: msg (optional - str: Message to print
+    local msg=""
+    [ -n "$1" ] && msg=$1
+    if [ "$msg" != "" ]
+    then
+        echoerr -e "\033[1;31m$msg\033[0m"
+    fi
+    exit 1
+}
+
+function cleanup_build_directory(){
+# $1: maindir (optional) - str: build directory to get rid
+
+    local maindir=""
+    [ -n  "$1" ] && maindir=$1
+
+    if [ "$maindir" != "" ]; then
+        rm -fr "$maindir"
+    fi
 }
