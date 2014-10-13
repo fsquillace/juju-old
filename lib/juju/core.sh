@@ -45,7 +45,7 @@ function install_package_group_from_file(){
 
     # Create the dirs
     mkdir -p $JUJU_PACKAGE_HOME/root
-    mkdir -p $JUJU_PACKAGE_HOME/metadata/packages
+    mkdir -p $JUJU_PACKAGE_HOME/metadata
 
     # Store the original working directory
     local origin_wd=$(pwd)
@@ -65,7 +65,7 @@ function install_package_group_from_file(){
     $TAR -zxpf ${origin_wd}/${pkggrpname}
 
     info "Installing ${pkggrpname}..."
-    ls ${maindir}/packages | xargs -I {} bash -c "cp -f -a ${maindir}/packages/{}/* $JUJU_PACKAGE_HOME/root"
+    cp -f -a ${maindir}/root/* $JUJU_PACKAGE_HOME/root
     cp -f -a $maindir/metadata/* $JUJU_PACKAGE_HOME/metadata/
     info "$pkggrpname installed successfully"
 
@@ -84,7 +84,7 @@ function install_package_group_from_repo(){
 
     # Create the dirs
     mkdir -p $JUJU_PACKAGE_HOME/root
-    mkdir -p $JUJU_PACKAGE_HOME/metadata/packages
+    mkdir -p $JUJU_PACKAGE_HOME/metadata
 
     # Store the original working directory
     local origin_wd=$(pwd)
@@ -105,7 +105,7 @@ function install_package_group_from_repo(){
     $TAR -zxpf ${pkggrp}.tar.gz
 
     info "Installing ${pkggrp}..."
-    ls ${maindir}/packages | xargs -I {} bash -c "cp -f -a ${maindir}/packages/{}/* $JUJU_PACKAGE_HOME/root"
+    cp -f -a ${maindir}/root/* $JUJU_PACKAGE_HOME/root
     cp -f -a $maindir/metadata/* $JUJU_PACKAGE_HOME/metadata/
     info "$pkggrp installed successfully"
 
@@ -177,13 +177,13 @@ function generate_package_group(){
     maindir=$(TMPDIR=/tmp mktemp -d -t juju.XXXXXXXXXX)
     trap - QUIT EXIT ABRT KILL TERM INT
     trap "cleanup_build_directory ${maindir}; die \"Error occurred during generation of package group\"" EXIT QUIT ABRT KILL TERM INT
-    mkdir -p ${maindir}/packages
+    mkdir -p ${maindir}/root
     mkdir -p ${maindir}/metadata
-    builtin cd ${maindir}/packages
+    builtin cd ${maindir}/root
 
     for pkgname in $@
     do
-        if [ -d "$pkgname" ]
+        if [ -d "${maindir}/metadata/$pkgname" ]
         then
             info "Skipping ${pkgname} since it was already built from previous dependencies."
             continue
@@ -196,41 +196,49 @@ function generate_package_group(){
         info "Copying the dependencies..."
         for dep in $deps
         do
-            [ -d "$dep" ] && continue
-            mkdir -p $dep
-            pacman -Ql $dep | grep -v "/$" | sed 's/.* //' | xargs -I {} bash -c "[ -f {} ] && cp -f --parents {} $dep"
+            [ -d "${maindir}/metadata/$dep" ] && continue
+            mkdir -p ${maindir}/metadata/$dep
+            pacman -Ql $dep | grep -v "/$" | sed 's/.* //' | xargs -I {} bash -c "cp -f -a --parents {} ."
         done
 
-        if [ "$(ls -A ${pkgname}/usr/bin)" ]
+        if [ "$(ls -A ./usr/bin)" ]
         then
-            mkdir -p ld
-            for executable in $(ls ${pkgname}/usr/bin/*)
+            [ ! -d "${maindir}/metadata/glibc" ] && warn "The dependency glibc is needed"
+            for executable in $(ls ./usr/bin/*)
             do
                 info "Copying the dynamic libraries for ${executable}..."
                 for lib in $( ldd ${executable} | grep -v dynamic | grep "=>" | awk '{print $3}' )
                 do
-                    [ -e $lib ] && cp -f --parents $lib ld
+                    if [ ! -e ./$lib ]
+                    then
+                        warn "The dependency for $lib is missing"
+                        if pacman -Qo $lib &> /dev/null
+                        then
+                            libpkgname=$(pacman -Qo $lib | awk '{print $5}')
+                            mkdir -p ${maindir}/metadata/$libpkgname
+                            pacman -Ql $libpkgname | grep -v "/$" | sed 's/.* //' | xargs -I {} bash -c "cp -f -a --parents {} ."
+                        fi
+                    fi
                 done
                 for lib in $( ldd ${executable} | grep -v dynamic | grep -v "=>" | awk '{print $1}' )
                 do
-                    [ -e $lib ] && cp -f --parents $lib ld
+                    if [ ! -e ./$lib ]
+                    then
+                        warn "The dependency for $lib is missing"
+                        if pacman -Qo $lib &> /dev/null
+                        then
+                            libpkgname=$(pacman -Qo $lib | awk '{print $5}')
+                            mkdir -p ${maindir}/metadata/$libpkgname
+                            pacman -Ql $libpkgname | grep -v "/$" | sed 's/.* //' | xargs -I {} bash -c "cp -f -a --parents {} ."
+                        fi
+                    fi
                 done
-
-                # ARCH amd64
-                if [ -f /lib64/ld-linux-x86-64.so.2 ]; then
-                    cp -f --parents /lib64/ld-linux-x86-64.so.2 ld
-                fi
-
-                # ARCH i386
-                if [ -f  /lib/ld-linux.so.2 ]; then
-                    cp -f --parents /lib/ld-linux.so.2 ld
-                fi
             done
         fi
 
     done
     info "Generating the compressed file ${1}.tar.gz..."
-    $TAR -zcpf ${origin_wd}/${1}.tar.gz -C ${maindir} packages
+    $TAR -zcpf ${origin_wd}/${1}.tar.gz -C ${maindir} root metadata
 
     info "Package group generated successfully"
 

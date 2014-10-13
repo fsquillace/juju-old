@@ -59,6 +59,10 @@ function error(){
 # $@: msg (mandatory) - str: Message to print
     echoerr -e "\033[1;31m$@\033[0m"
 }
+function warn(){
+# $@: msg (mandatory) - str: Message to print
+    echoerr -e "\033[1;33m$@\033[0m"
+}
 function info(){
 # $@: msg (mandatory) - str: Message to print
     echo -e "\033[1;37m$@\033[0m"
