@@ -102,7 +102,7 @@ function install_package_group_from_repo(){
 
     builtin cd ${maindir}
     $WGET ${JUJU_REPO}/$(uname -m)/${pkggrp}.tar.gz
-    $TAR -zxvf ${pkggrp}.tar.gz
+    $TAR -zxpf ${pkggrp}.tar.gz
 
     info "Installing ${pkggrp}..."
     ls ${maindir}/packages | xargs -I {} bash -c "cp -f -a ${maindir}/packages/{}/* $JUJU_PACKAGE_HOME/root"
@@ -230,7 +230,7 @@ function generate_package_group(){
 
     done
     info "Generating the compressed file ${1}.tar.gz..."
-    $TAR -zcf ${origin_wd}/${1}.tar.gz -C ${maindir} packages
+    $TAR -zcpf ${origin_wd}/${1}.tar.gz -C ${maindir} packages
 
     info "Package group generated successfully"
 
