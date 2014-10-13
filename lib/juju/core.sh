@@ -204,19 +204,20 @@ function generate_package_group(){
         if [ "$(ls -A ./usr/bin)" ]
         then
             [ ! -d "${maindir}/metadata/glibc" ] && warn "The dependency glibc is needed"
-            for executable in $(ls ./usr/bin/*)
+            for executable in $(find ./usr/bin/ -type f)
             do
                 info "Copying the dynamic libraries for ${executable}..."
                 for lib in $( ldd ${executable} | grep -v dynamic | grep "=>" | awk '{print $3}' )
                 do
                     if [ ! -e ./$lib ]
                     then
-                        warn "The dependency for $lib is missing"
                         if pacman -Qo $lib &> /dev/null
                         then
                             libpkgname=$(pacman -Qo $lib | awk '{print $5}')
                             mkdir -p ${maindir}/metadata/$libpkgname
                             pacman -Ql $libpkgname | grep -v "/$" | sed 's/.* //' | xargs -I {} bash -c "cp -f -a --parents {} ."
+                        else
+                            echo "$lib" | grep "^/" &> /dev/null && warn "The dependency for $lib is missing"
                         fi
                     fi
                 done
@@ -224,12 +225,13 @@ function generate_package_group(){
                 do
                     if [ ! -e ./$lib ]
                     then
-                        warn "The dependency for $lib is missing"
                         if pacman -Qo $lib &> /dev/null
                         then
                             libpkgname=$(pacman -Qo $lib | awk '{print $5}')
                             mkdir -p ${maindir}/metadata/$libpkgname
                             pacman -Ql $libpkgname | grep -v "/$" | sed 's/.* //' | xargs -I {} bash -c "cp -f -a --parents {} ."
+                        else
+                            echo "$lib" | grep "^/" &> /dev/null && warn "The dependency for $lib is missing"
                         fi
                     fi
                 done
