@@ -201,7 +201,7 @@ function generate_package_group(){
             pacman -Ql $dep | grep -v "/$" | sed 's/.* //' | xargs -I {} bash -c "[ -f {} ] && cp -f --parents {} $dep"
         done
 
-        if [ -e "${pkgname}/usr/bin" ]
+        if [ "$(ls -A ${pkgname}/usr/bin)" ]
         then
             mkdir -p ld
             for executable in $(ls ${pkgname}/usr/bin/*)
